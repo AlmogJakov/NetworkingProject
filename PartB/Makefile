@@ -15,4 +15,4 @@ client-ipv6: Udp-Server.cpp
 	g++ -o udpclientipv6 Udp-Client-IPV6.cpp
 
 clean:
-	rm -f *.o udpclient udpserver serveripv6 clientipv6
+	rm -f *.o udpclient udpserver udpserveripv6 udpclientipv6
