@@ -28,7 +28,7 @@
 #include <unistd.h>
 #endif
 
-#define SERVER_IP_ADDRESS "192.168.190.129"
+#define SERVER_IP_ADDRESS " 192.168.56.1"
 #define SERVER_PORT 5060
 
 int main() {
@@ -37,17 +37,23 @@ int main() {
 	char message[] = "Hello, from the Server\n";
 	int messageLen = strlen(message) + 1;
 	// Create socket
-	if ((s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+	if ((s = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
 		printf("Could not create socket : %d\n", errno);
 		return -1;
 	}
 	// setup Server address structure
-	struct sockaddr_in serverAddress;
+	struct sockaddr_in6 serverAddress;
 	memset((char *)&serverAddress, 0, sizeof(serverAddress));
-	serverAddress.sin_family = AF_INET;
-	serverAddress.sin_port = htons(SERVER_PORT);
-	inet_pton(AF_INET, (const char*)SERVER_IP_ADDRESS, &(serverAddress.sin_addr));
-	//Bind
+//	serverAddress.sin6_family = AF_INET6;
+//	serverAddress.sin6_port = htons(SERVER_PORT);
+    serverAddress.sin6_family = AF_INET6;
+    serverAddress.sin6_addr = in6addr_any;//listen to any IPv6 addr
+    serverAddress.sin6_port = htons(SERVER_PORT);
+    //serverAddress.sin6_addr=in6addr_any;
+	//inet_pton(AF_INET6, (const char*)SERVER_IP_ADDRESS, &(serverAddress.sin6_addr));
+   // inet_pton(AF_INET6, in6addr_any, &(serverAddress.sin6_addr));
+
+    //Bind
 	if (bind(s, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) == -1) {
 		printf("bind() failed with error code : %d\n", errno);
 		// TODO: cleanup the socket;
@@ -55,7 +61,7 @@ int main() {
 	}
 	printf("After bind(). Waiting for clients\n");
 	// setup Client address structure
-	struct sockaddr_in clientAddress;
+	struct sockaddr_in6 clientAddress;
 	socklen_t clientAddressLen = sizeof(clientAddress);
 	memset((char *)&clientAddress, 0, sizeof(clientAddress));
 	//keep listening for data
@@ -73,9 +79,9 @@ int main() {
 			break;
 		}
 		char clientIPAddrReadable[32] = { '\0' };
-		inet_ntop(AF_INET, &clientAddress.sin_addr, clientIPAddrReadable, sizeof(clientIPAddrReadable));
+		inet_ntop(AF_INET, &clientAddress.sin6_addr, clientIPAddrReadable, sizeof(clientIPAddrReadable));
 		//print details of the client/peer and the data received
-		printf("Received packet from %s:%d\n", clientIPAddrReadable, ntohs(clientAddress.sin_port));
+		printf("Received packet from %s:%d\n", clientIPAddrReadable, ntohs(clientAddress.sin6_port));
 		printf("Data is: %s\n", buffer);
 		//now reply to the Client
 		if (sendto(s, message, messageLen, 0, (struct sockaddr*) &clientAddress, clientAddressLen) == -1) {

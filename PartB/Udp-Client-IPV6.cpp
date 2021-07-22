@@ -20,7 +20,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#define SERVER_IP_ADDRESS "192.168.190.129"
+#define SERVER_IP_ADDRESS "192.168.56.1"
 #define SERVER_PORT 5060
 
 int main() {
@@ -29,17 +29,19 @@ int main() {
 	char message[] = "Good morning, Vietnam\n";
 	int messageLen = strlen(message) + 1;
 	// Create socket
-	if ((s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+	if ((s = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
 		printf("Could not create socket : %d\n", errno);
 		return -1;
 	}
 	// Setup the server address structure.
 	// Port and IP should be filled in network byte order (learn bin-endian, little-endian)
-	struct sockaddr_in serverAddress;
+	struct sockaddr_in6 serverAddress;
 	memset(&serverAddress, 0, sizeof(serverAddress));
-	serverAddress.sin_family = AF_INET;
-	serverAddress.sin_port = htons(SERVER_PORT);
-	int rval = inet_pton(AF_INET, (const char*)SERVER_IP_ADDRESS, &serverAddress.sin_addr);
+	serverAddress.sin6_family = AF_INET6;
+	serverAddress.sin6_port = htons(SERVER_PORT);
+//int rval = inet_pton(AF_INET6, (const char*)SERVER_IP_ADDRESS, &serverAddress.sin6_addr);
+    int rval = inet_pton(AF_INET6, "::1", &serverAddress.sin6_addr);//"::1 is for the loopback , otherwise we would have to get
+    //our IPv6 address ,which we cant get since we dont have IPv6 in our computers
 	if (rval <= 0) {
 		printf("inet_pton() failed\n");
 		return -1;
@@ -49,7 +51,7 @@ int main() {
 		printf("sendto() failed with error code  : %d\n", errno);
 		return -1;
 	}
-	struct sockaddr_in fromAddress;
+	struct sockaddr_in6 fromAddress;
 	socklen_t fromAddressSize = sizeof(fromAddress);
 	memset((char *)&fromAddress, 0, sizeof(fromAddress));
 	// try to receive some data, this is a blocking call
