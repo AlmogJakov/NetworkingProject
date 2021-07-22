@@ -9,7 +9,7 @@ from datetime import datetime
 serverSocket = socket(AF_INET, SOCK_DGRAM)
 serverSocket.settimeout(1.0)
 # serverSocket.bind((my_ip, my_port))
-serverSocket.bind(('127.0.0.1', 1024))
+# serverSocket.bind(('127.0.0.1', 1024))
 # serverSocket.connect((my_ip, my_port))
 # serverSocket.connect((serv_ip, serv_port))
 sequence = 1
