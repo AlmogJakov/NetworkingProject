@@ -1,9 +1,12 @@
 # Makefile for TCP project
 
-all: example
+all: node example
 
-example: example.c
-	gcc -o example example.c select.c
+node: select.cpp node.cpp
+	g++ -o node select.cpp node.cpp
+
+example: example.cpp
+	g++ -o example example.cpp select.cpp
 
 clean:
-	rm -f *.o example
+	rm -f *.o example node
