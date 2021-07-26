@@ -146,7 +146,7 @@ int main(int argc, char *argv[]) {
             outgoing.dest = 0;
             outgoing.trailMSG = 0;
             outgoing.funcID = 4; // connect function num is 4
-            memcpy(outgoing.payload, "hey thereee!", 10); // set the payload
+            memcpy(outgoing.payload, "hey thereee!", 11); // set the payload
             char outgoing_buffer[512];
             memcpy(outgoing_buffer, &outgoing, sizeof(outgoing));
             send(ret, outgoing_buffer, sizeof(outgoing_buffer), 0);
