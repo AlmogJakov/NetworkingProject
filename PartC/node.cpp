@@ -32,9 +32,7 @@ int main(int argc, char *argv[]) {
     printf("Please choose a port: ");
     scanf("%d", &r_port);
     char buff[1025];
-    //stringstream ss;
-    time_t ticks; 
-
+    // time_t ticks;
     innerfd = socket(AF_INET, SOCK_STREAM, 0);
     memset(&serv_addr, '0', sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
@@ -43,57 +41,40 @@ int main(int argc, char *argv[]) {
     bind(innerfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
     printf("adding fd(%d) to monitoring\n", innerfd);
     add_fd_to_monitoring(innerfd);
-    //printf("adding fd2(%d) to monitoring\n", outerfd);
-    //add_fd_to_monitoring(outerfd);
     listen(innerfd, 10);
-    //listen(outerfd, 10); 
-
+    /* Print my ip */
     printf("---------------------------------\n");
-    // print my ip
     struct sockaddr_in* pV4Addr = (struct sockaddr_in*)&inet_addr;
     struct in_addr ipAddr = pV4Addr->sin_addr;
     char str[INET_ADDRSTRLEN];
     inet_ntop( AF_INET, &ipAddr, str, INET_ADDRSTRLEN );
     printf("MY IP: %s\n", str);
-    // print my port
+    /* Print my port */
     printf("MY PORTS: %d\n", r_port);
     printf("---------------------------------\n");
 
-    
-
-    //for (i=0; i<10; ++i) {
     while(true){
         memset(&buff, '\0', sizeof(buff));
 	    printf("waiting for input...\n");
-        //cout << "hey!!!" << endl;
 	    ret = wait_for_input();
 	    printf("fd: %d is ready. reading...\n", ret);
 	    
-        // At the file descriptor level, stdin is defined to be file descriptor 0,
-        // stdout is defined to be file descriptor 1,
-        // and stderr is defined to be file descriptor 2.
+        /* At the file descriptor level, stdin is defined to be file descriptor 0,
+           stdout is defined to be file descriptor 1,
+           and stderr is defined to be file descriptor 2. */
         if (ret < 2) { // std input
             read(ret, buff, 1025);
             if (buff[strlen(buff)-1]=='\n') buff[strlen(buff)-1] = '\0';
-            //string str(buff);
             stringstream ss;
             ss << buff;
-            // split
-            string splited[4];
-            // printf("------------------------\n");
-            // printf("SPLITED WORDS: \n");
+            string splited[4]; // split
             int i = 0;
-            // while(getline(ss,splited[i],',')) {
-            //     //cout << splited[i++] << endl;
-            // };
             getline(ss,splited[0],',');
-            // printf("------------------------\n");
             if (splited[0].compare("setid")==0) {
                 getline(ss,splited[1],','); // id
                 id = stoi(splited[1]);
                 cout << "MY ID: " << id << endl;
-            }
-            if (splited[0].compare("connect")==0) {
+            } else if (splited[0].compare("connect")==0) {
                 getline(ss,splited[1],':'); // ip
                 getline(ss,splited[2],':'); // port
                 uint16_t port = stoul(splited[2]);
@@ -146,7 +127,7 @@ int main(int argc, char *argv[]) {
             outgoing.dest = 0;
             outgoing.trailMSG = 0;
             outgoing.funcID = 4; // connect function num is 4
-            memcpy(outgoing.payload, "hey thereee!", 11); // set the payload
+            memcpy(outgoing.payload, "hey thereee!", 12); // set the payload
             char outgoing_buffer[512];
             memcpy(outgoing_buffer, &outgoing, sizeof(outgoing));
             send(ret, outgoing_buffer, sizeof(outgoing_buffer), 0);

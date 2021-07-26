@@ -5,7 +5,7 @@ typedef struct packetMSG {
     int dest;
     int trailMSG;
     int funcID;
-    char payload[492];
+    char payload[492] = {0};
 }message;
 void gotmsg(message* msg);
 // Parameters: The message number on it Sent the ack (4 bytes First in payload)
