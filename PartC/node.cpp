@@ -68,14 +68,12 @@ int main(int argc, char *argv[]) {
         //cout << "hey!!!" << endl;
 	    ret = wait_for_input();
 	    printf("fd: %d is ready. reading...\n", ret);
-	    read(ret, buff, 1025);
+	    
         // At the file descriptor level, stdin is defined to be file descriptor 0,
         // stdout is defined to be file descriptor 1,
         // and stderr is defined to be file descriptor 2.
-
-        
-
         if (ret < 2) { // std input
+            read(ret, buff, 1025);
             if (buff[strlen(buff)-1]=='\n') buff[strlen(buff)-1] = '\0';
             //string str(buff);
             stringstream ss;
@@ -115,18 +113,19 @@ int main(int argc, char *argv[]) {
                     printf("\nConnection Failed \n");
                     return -1;
                 }
-                message out;
-                out.id = rand();
-                out.src = id;
-                out.dest = 0;
-                out.trailMSG = 0;
-                out.funcID = 4; // connect function num is 4
-                memcpy(out.payload, "hey there!", 10); // set the payload
-                char buffeR[512];
-                memcpy(buffeR, &out, sizeof(out));
-                send(new_sock , buffeR , sizeof(buffeR) , 0);
+                add_fd_to_monitoring(new_sock);
+                message outgoing;
+                outgoing.id = rand();
+                outgoing.src = id;
+                outgoing.dest = 0;
+                outgoing.trailMSG = 0;
+                outgoing.funcID = 4; // connect function num is 4
+                memcpy(outgoing.payload, "hey there!", 10); // set the payload
+                char outgoing_buffer[512];
+                memcpy(outgoing_buffer, &outgoing, sizeof(outgoing));
+                send(new_sock, outgoing_buffer, sizeof(outgoing_buffer), 0);
             }
-        } else { // we got a packet
+        } else { /* we got a packet */
             int addrlen;
             /* if ret==innerfd then we got a new connection! */
             if (ret==innerfd) {
@@ -134,10 +133,23 @@ int main(int argc, char *argv[]) {
                     perror("accept");
                     exit(EXIT_FAILURE);
                 }
+                add_fd_to_monitoring(ret);
             }
-            char buffer[512] = {0};
-            read(ret ,buffer, 512);
-            printf("%s\n",buffer+20);
+            message* incoming = (message*)malloc(sizeof(message));
+            read(ret ,incoming, 512);
+            printf("%s\n",incoming->payload);
+            
+
+            message outgoing;
+            outgoing.id = rand();
+            outgoing.src = id;
+            outgoing.dest = 0;
+            outgoing.trailMSG = 0;
+            outgoing.funcID = 4; // connect function num is 4
+            memcpy(outgoing.payload, "hey thereee!", 10); // set the payload
+            char outgoing_buffer[512];
+            memcpy(outgoing_buffer, &outgoing, sizeof(outgoing));
+            send(ret, outgoing_buffer, sizeof(outgoing_buffer), 0);
             // message incming_msg;
             // int n = read(new_socket, (void*)&incming_msg, 512);
             // if(incming_msg.funcID==4){
@@ -149,6 +161,7 @@ int main(int argc, char *argv[]) {
             // cout << n << endl;
             //add_fd_to_monitoring(new_socket);
             //gotmsg(&incming_msg);
+            delete(incoming);
         }
 	}
 }
