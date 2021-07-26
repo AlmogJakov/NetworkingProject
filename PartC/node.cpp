@@ -8,7 +8,8 @@
 #include <string.h>
 #include <sys/types.h>
 #include <time.h>
-
+#include <map>
+#include <unordered_map>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -19,17 +20,10 @@
 
 using namespace std;
 
-struct packetMSG {
-    int id;
-    int src;
-    int dest;
-    int trailMSG;
-    int funcID;
-    char payload[492];
-};
 
 int id;
-
+unordered_map<int,const unsigned int> sockets;
+//message * main_msg;
 int main(int argc, char *argv[]) {
     int innerfd = 0, outerfd=0;
     struct sockaddr_in serv_addr; 
@@ -46,12 +40,10 @@ int main(int argc, char *argv[]) {
     memset(&serv_addr, '0', sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    serv_addr.sin_port = htons(r_port); 
-
+    serv_addr.sin_port = htons(r_port);
     bind(innerfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
     serv_addr.sin_port = htons(r_port+1);  
-    bind(outerfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)); 
-
+    bind(outerfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
     printf("adding fd1(%d) to monitoring\n", innerfd);
     add_fd_to_monitoring(innerfd);
     //printf("adding fd2(%d) to monitoring\n", outerfd);
@@ -72,7 +64,8 @@ int main(int argc, char *argv[]) {
 
     
 
-    for (i=0; i<10; ++i) {
+    //for (i=0; i<10; ++i) {
+    while(true){
         memset(&buff, '\0', sizeof(buff));
 	    printf("waiting for input...\n");
         //cout << "hey!!!" << endl;
@@ -106,6 +99,8 @@ int main(int argc, char *argv[]) {
                 cout << "MY ID: " << id << endl;
             }
             if (splited[0].compare("connect")==0) {
+                int new_sock;
+                new_sock = socket(AF_INET, SOCK_STREAM, 0);
                 getline(ss,splited[1],':'); // ip
                 getline(ss,splited[2],':'); // port
                 uint16_t port = stoul(splited[2]);
@@ -123,64 +118,115 @@ int main(int argc, char *argv[]) {
                     printf("\nConnection Failed \n");
                     return -1;
                 }
-                //struct packetMSG* pkt{};
-                //struct packetMSG* pkt = (struct packetMSG*)malloc(sizeof(struct packetMSG));
-                struct packetMSG pkt;
-                pkt.id = 10;
-                pkt.src = id;
-                pkt.dest = 0;
-                pkt.trailMSG = 0;
-                pkt.funcID = 4;
-                //sendto(outerfd,&pkt,sizeof(struct packetMSG),0,&destAddress,sizeof(destAddress));
-                //send(outerfd , &pkt , sizeof(pkt) , 0);
-                write(outerfd , &pkt , sizeof(pkt));
-                //char *hello = "Hello from client";
-                //send(outerfd , hello , strlen(hello) , 0 );
-	            // int rval = inet_pton(AF_INET, (const char*)destip, &destAddress.sin_addr);
-	            // if (rval <= 0) {
-		        //     printf("inet_pton() failed\n");
-		        //     return -1;
-	            // } else {
-                //     cout << "rval: " << rval << endl;
-                // }
+                message out;
+                out.id = 10;
+                out.src = id;
+                out.dest = 0;
+                out.trailMSG = 0;
+                out.funcID = 4;
+                write(outerfd , &out , sizeof(out));
             }
-        } else { // we got a packet
+        }
+        else { // we got a packet
             //cout << "ret: " << ret << endl;
             int new_socket;
             int addrlen;
-            if ((new_socket = accept(innerfd, (struct sockaddr *)&serv_addr, (socklen_t*)&addrlen))<0) {
+            //if ((new_socket = accept(innerfd, (struct sockaddr *)&serv_addr, (socklen_t*)&addrlen))<0) {
+            if ((new_socket = accept(ret, (struct sockaddr *)&serv_addr, (socklen_t*)&addrlen))<0) {
+
                 perror("accept");
                 exit(EXIT_FAILURE);
             }
-            
-            // if ((accept(outerfd, (struct sockaddr*)&destAddress, (socklen_t*)sizeof(destAddress)))<0) {
-            //         perror("accept");
-            //         exit(EXIT_FAILURE);
-            // }
-            //struct packetMSG* pckt = (struct packetMSG*)malloc(sizeof(struct packetMSG));
-            //struct packetMSG pckt;
-            char buffer[512] = {0};
-            //int n = recv(innerfd, (void*)&buffer, sizeof(buffer), 0);
-            int n = read(innerfd, (void*)&buffer, sizeof(buffer));
+            message incming_msg;
+            int n = read(new_socket, (void*)&incming_msg, 512);
+            if(incming_msg.funcID==4){
+                cnct(new_socket,&incming_msg);
+                //write(new_socket, (void*)&incming_msg, 512);
+                continue;
+            }
             cout << n << endl;
-            //char buffer[512] = {0};
-            //read(innerfd , pckt , 512);
-            //char buffeR[1024] = {0};
-            //read(new_socket , buffeR, 1024);
-            //printf("%s\n",buffer);
-            // if (pckt.funcID == 4) {
-            //     cout << "Got Connection!" << endl;
-            // }
-            add_fd_to_monitoring(new_socket);
-            //cout << buffer << endl;
-            //cout << "src: " << pckt->src << endl;
-            //cout << "dest: " << pckt->dest << endl;
-            //cout << "id: " << pckt->funcID << endl;
-            //struct packetMSG pckt = (struct packetMSG)buffer*;
-            // if (pckt->funcID == 4) {
-            //     cout << "Got Connection!" << endl;
-            // }
-            //struct cooked_packet* reply_packet = (struct cooked_packet*)malloc(sizeof(struct cooked_packet));
+            //add_fd_to_monitoring(new_socket);
+            gotmsg(&incming_msg);
         }
 	}
 }
+void gotmsg(message* msg){
+    switch(msg->funcID){
+        case 1:{
+            ack(msg);
+            break;}
+        case 2:{
+            nack(msg->id);
+            break;}
+//        case 4:{
+//            Connect();
+//            break;
+//        }
+        case 8:{
+            discover(msg->dest);
+            break;
+        }
+        case 16:{
+//            int f_msg;
+//            int length;
+//            memcpy(&f_msg,main_msg->payload,sizeof(f_msg) );
+//            memcpy(&length,main_msg->payload+sizeof(f_msg),sizeof(length));
+//            int * way;
+//            int i=0;
+//            while(i<length){
+//                memcpy(reinterpret_cast<void *>(way[i]), main_msg->payload + 8 + 4 * i, sizeof(int));
+//            }
+//            route(f_msg,length,way);
+            break;
+        }
+        case 32:{
+            int length;
+            //memcpy(length, main_msg->payload,sizeof(length));
+
+            break;
+        }
+        case 64:{break;}
+    }
+}
+
+void ack(message * msg){//,int messagenum){
+    cout<<"Ack"<<endl;
+//    message rply;
+//    rply.id=random();
+//    rply.src=id;
+//    memcpy(rply.payload, (char*)&msg->id,sizeof(int));
+//    rply.trailMSG=0;
+//    rply.funcID=1;
+//
+    //rply->payload=(char*)msg->id;
+
+}
+
+void nack(int messagenum){
+
+    int msgid=5;
+    message ack;
+    ack.id=msgid;
+    ack.src=id;
+
+}
+
+void cnct(const unsigned int new_socket, message * msg){
+    message rply;
+    rply.id=random();
+    rply.src=id;
+    memcpy(rply.payload, (char*)&msg->id,sizeof(int));
+    rply.trailMSG=0;
+    rply.funcID=1;
+    sockets.insert(make_pair(msg->src,new_socket));
+    add_fd_to_monitoring(new_socket);
+    write(new_socket,&rply,sizeof(rply));
+}
+void discover(int message_num){};
+void route(int message_num,int length,int * way){}
+void Send(int length,char*){}
+void relay(int message_num){};
+
+
+
+
