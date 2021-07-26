@@ -36,15 +36,12 @@ int main(int argc, char *argv[]) {
     time_t ticks; 
 
     innerfd = socket(AF_INET, SOCK_STREAM, 0);
-    outerfd = socket(AF_INET, SOCK_STREAM, 0);
     memset(&serv_addr, '0', sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     serv_addr.sin_port = htons(r_port);
     bind(innerfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
-    serv_addr.sin_port = htons(r_port+1);  
-    bind(outerfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
-    printf("adding fd1(%d) to monitoring\n", innerfd);
+    printf("adding fd(%d) to monitoring\n", innerfd);
     add_fd_to_monitoring(innerfd);
     //printf("adding fd2(%d) to monitoring\n", outerfd);
     //add_fd_to_monitoring(outerfd);
@@ -59,7 +56,7 @@ int main(int argc, char *argv[]) {
     inet_ntop( AF_INET, &ipAddr, str, INET_ADDRSTRLEN );
     printf("MY IP: %s\n", str);
     // print my port
-    printf("MY PORTS: %d, %d\n", r_port, r_port+1);
+    printf("MY PORTS: %d\n", r_port);
     printf("---------------------------------\n");
 
     
@@ -99,14 +96,14 @@ int main(int argc, char *argv[]) {
                 cout << "MY ID: " << id << endl;
             }
             if (splited[0].compare("connect")==0) {
-                int new_sock;
-                new_sock = socket(AF_INET, SOCK_STREAM, 0);
                 getline(ss,splited[1],':'); // ip
                 getline(ss,splited[2],':'); // port
                 uint16_t port = stoul(splited[2]);
                 char const* destip = splited[1].c_str();
                 // cout << "ip: " << splited[1] << ". port: " << splited[2] << endl;
                 struct sockaddr_in destAddress;
+                int new_sock = socket(AF_INET, SOCK_STREAM, 0);
+                bind(new_sock, (struct sockaddr*)&destAddress, sizeof(destAddress));
                 memset(&destAddress, 0, sizeof(destAddress));
 	            destAddress.sin_family = AF_INET;
                 destAddress.sin_port = htons(port);
@@ -114,39 +111,44 @@ int main(int argc, char *argv[]) {
                     printf("\nInvalid address/ Address not supported \n");
                     return -1;
                 }
-                if (connect(outerfd, (struct sockaddr*)&destAddress, sizeof(destAddress)) < 0) {
+                if (connect(new_sock, (struct sockaddr*)&destAddress, sizeof(destAddress)) < 0) {
                     printf("\nConnection Failed \n");
                     return -1;
                 }
                 message out;
-                out.id = 10;
+                out.id = rand();
                 out.src = id;
                 out.dest = 0;
                 out.trailMSG = 0;
-                out.funcID = 4;
-                write(outerfd , &out , sizeof(out));
+                out.funcID = 4; // connect function num is 4
+                memcpy(out.payload, "hey there!", 10); // set the payload
+                char buffeR[512];
+                memcpy(buffeR, &out, sizeof(out));
+                send(new_sock , buffeR , sizeof(buffeR) , 0);
             }
-        }
-        else { // we got a packet
-            //cout << "ret: " << ret << endl;
-            int new_socket;
+        } else { // we got a packet
             int addrlen;
-            //if ((new_socket = accept(innerfd, (struct sockaddr *)&serv_addr, (socklen_t*)&addrlen))<0) {
-            if ((new_socket = accept(ret, (struct sockaddr *)&serv_addr, (socklen_t*)&addrlen))<0) {
-
-                perror("accept");
-                exit(EXIT_FAILURE);
+            /* if ret==innerfd then we got a new connection! */
+            if (ret==innerfd) {
+                if ((ret = accept(ret, (struct sockaddr *)&serv_addr, (socklen_t*)&addrlen))<0) {
+                    perror("accept");
+                    exit(EXIT_FAILURE);
+                }
             }
-            message incming_msg;
-            int n = read(new_socket, (void*)&incming_msg, 512);
-            if(incming_msg.funcID==4){
-                cnct(new_socket,&incming_msg);
-                //write(new_socket, (void*)&incming_msg, 512);
-                continue;
-            }
-            cout << n << endl;
+            char buffer[512] = {0};
+            read(ret ,buffer, 512);
+            printf("%s\n",buffer+20);
+            // message incming_msg;
+            // int n = read(new_socket, (void*)&incming_msg, 512);
+            // if(incming_msg.funcID==4){
+            //     cout<<"MSG"<<endl;
+            //     cnct(new_socket,&incming_msg);
+            //     //write(new_socket, (void*)&incming_msg, 512);
+            //     continue;
+            // }
+            // cout << n << endl;
             //add_fd_to_monitoring(new_socket);
-            gotmsg(&incming_msg);
+            //gotmsg(&incming_msg);
         }
 	}
 }
