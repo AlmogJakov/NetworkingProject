@@ -54,10 +54,10 @@ int main(int argc, char *argv[]) {
 
     printf("adding fd1(%d) to monitoring\n", innerfd);
     add_fd_to_monitoring(innerfd);
-    printf("adding fd2(%d) to monitoring\n", outerfd);
-    add_fd_to_monitoring(outerfd);
+    //printf("adding fd2(%d) to monitoring\n", outerfd);
+    //add_fd_to_monitoring(outerfd);
     listen(innerfd, 10);
-    listen(outerfd, 10); 
+    //listen(outerfd, 10); 
 
     printf("---------------------------------\n");
     // print my ip
@@ -100,33 +100,42 @@ int main(int argc, char *argv[]) {
             // };
             getline(ss,splited[0],',');
             // printf("------------------------\n");
-
-
-
-            
-	        
-
+            if (splited[0].compare("setid")==0) {
+                getline(ss,splited[1],','); // id
+                id = stoi(splited[1]);
+                cout << "MY ID: " << id << endl;
+            }
             if (splited[0].compare("connect")==0) {
                 getline(ss,splited[1],':'); // ip
                 getline(ss,splited[2],':'); // port
-                uint16_t port{}; // = stoul(splited[2]);
-                ss >> port;
+                uint16_t port = stoul(splited[2]);
                 char const* destip = splited[1].c_str();
-                cout << "ip: " << splited[1] << ". port: " << splited[2] << endl;
-                //struct sockaddr_in serv_addr;
+                // cout << "ip: " << splited[1] << ". port: " << splited[2] << endl;
                 struct sockaddr_in destAddress;
                 memset(&destAddress, 0, sizeof(destAddress));
 	            destAddress.sin_family = AF_INET;
                 destAddress.sin_port = htons(port);
-                if(inet_pton(AF_INET, "127.0.0.1", &destAddress.sin_addr)<=0) {
+                if(inet_pton(AF_INET, destip, &destAddress.sin_addr)<=0) {
                     printf("\nInvalid address/ Address not supported \n");
                     return -1;
                 }
-                if (connect(innerfd, (struct sockaddr*)&destAddress, sizeof(destAddress)) < 0) {
+                if (connect(outerfd, (struct sockaddr*)&destAddress, sizeof(destAddress)) < 0) {
                     printf("\nConnection Failed \n");
                     return -1;
                 }
-                // send(sock , hello , strlen(hello) , 0 );
+                //struct packetMSG* pkt{};
+                //struct packetMSG* pkt = (struct packetMSG*)malloc(sizeof(struct packetMSG));
+                struct packetMSG pkt;
+                pkt.id = 10;
+                pkt.src = id;
+                pkt.dest = 0;
+                pkt.trailMSG = 0;
+                pkt.funcID = 4;
+                //sendto(outerfd,&pkt,sizeof(struct packetMSG),0,&destAddress,sizeof(destAddress));
+                //send(outerfd , &pkt , sizeof(pkt) , 0);
+                write(outerfd , &pkt , sizeof(pkt));
+                //char *hello = "Hello from client";
+                //send(outerfd , hello , strlen(hello) , 0 );
 	            // int rval = inet_pton(AF_INET, (const char*)destip, &destAddress.sin_addr);
 	            // if (rval <= 0) {
 		        //     printf("inet_pton() failed\n");
@@ -136,16 +145,41 @@ int main(int argc, char *argv[]) {
                 // }
             }
         } else { // we got a packet
+            //cout << "ret: " << ret << endl;
+            int new_socket;
+            int addrlen;
+            if ((new_socket = accept(innerfd, (struct sockaddr *)&serv_addr, (socklen_t*)&addrlen))<0) {
+                perror("accept");
+                exit(EXIT_FAILURE);
+            }
             
             // if ((accept(outerfd, (struct sockaddr*)&destAddress, (socklen_t*)sizeof(destAddress)))<0) {
             //         perror("accept");
             //         exit(EXIT_FAILURE);
             // }
-            //struct packetMSG pckt = (struct packetMSG)(buff);
-            struct packetMSG* pckt = (struct packetMSG*)malloc(sizeof(struct packetMSG));
-            if (pckt->funcID == 4) {
-                cout << "Got Connection!" << endl;
-            }
+            //struct packetMSG* pckt = (struct packetMSG*)malloc(sizeof(struct packetMSG));
+            //struct packetMSG pckt;
+            char buffer[512] = {0};
+            //int n = recv(innerfd, (void*)&buffer, sizeof(buffer), 0);
+            int n = read(innerfd, (void*)&buffer, sizeof(buffer));
+            cout << n << endl;
+            //char buffer[512] = {0};
+            //read(innerfd , pckt , 512);
+            //char buffeR[1024] = {0};
+            //read(new_socket , buffeR, 1024);
+            //printf("%s\n",buffer);
+            // if (pckt.funcID == 4) {
+            //     cout << "Got Connection!" << endl;
+            // }
+            add_fd_to_monitoring(new_socket);
+            //cout << buffer << endl;
+            //cout << "src: " << pckt->src << endl;
+            //cout << "dest: " << pckt->dest << endl;
+            //cout << "id: " << pckt->funcID << endl;
+            //struct packetMSG pckt = (struct packetMSG)buffer*;
+            // if (pckt->funcID == 4) {
+            //     cout << "Got Connection!" << endl;
+            // }
             //struct cooked_packet* reply_packet = (struct cooked_packet*)malloc(sizeof(struct cooked_packet));
         }
 	}
