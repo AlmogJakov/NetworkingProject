@@ -8,6 +8,8 @@
 #include <string.h>
 #include <sys/types.h>
 #include <time.h>
+#include <netdb.h> // addrinfo
+
 #include <map>
 #include <unordered_map>
 #include <iostream>
@@ -17,8 +19,6 @@
 
 #include "select.hpp"
 #include "node.hpp"
-
-using namespace std;
 
 
 int id;
@@ -42,8 +42,19 @@ int main(int argc, char *argv[]) {
     printf("adding fd(%d) to monitoring\n", innerfd);
     add_fd_to_monitoring(innerfd);
     listen(innerfd, 10);
-    /* Print my ip */
     printf("---------------------------------\n");
+    /* print my local ip */
+    // addrinfo *addr_info = NULL;
+    // char hostName[100];
+    // char ip[30] = {0};
+    // gethostname(hostName, sizeof(hostName));
+    // cout << hostName << endl;;
+    // int err = getaddrinfo(hostName,NULL,NULL,&addr_info);
+    // in_addr ipaddr =(((sockaddr_in*)(addr_info->ai_addr))->sin_addr);
+    // strcpy(ip,inet_ntoa(ipaddr));
+    // cout << "MY LOCAL IP: " << ip << endl;
+    cout << "MY LOCAL IP: " << "192.168.190.129" << endl;
+    /* Print my ip */
     struct sockaddr_in* pV4Addr = (struct sockaddr_in*)&inet_addr;
     struct in_addr ipAddr = pV4Addr->sin_addr;
     char str[INET_ADDRSTRLEN];
@@ -73,7 +84,9 @@ int main(int argc, char *argv[]) {
             if (splited[0].compare("setid")==0) {
                 getline(ss,splited[1],','); // id
                 id = stoi(splited[1]);
+                cout << "\033[1;36m"; // print in color
                 cout << "MY ID: " << id << endl;
+                cout << "\033[0m"; // end print in color
             } else if (splited[0].compare("connect")==0) {
                 getline(ss,splited[1],':'); // ip
                 getline(ss,splited[2],':'); // port
@@ -118,30 +131,14 @@ int main(int argc, char *argv[]) {
             }
             message* incoming = (message*)malloc(sizeof(message));
             read(ret ,incoming, 512);
-            printf("%s\n",incoming->payload);
-            
-
-            message outgoing;
-            outgoing.id = rand();
-            outgoing.src = id;
-            outgoing.dest = 0;
-            outgoing.trailMSG = 0;
-            outgoing.funcID = 4; // connect function num is 4
-            memcpy(outgoing.payload, "hey thereee!", 12); // set the payload
-            char outgoing_buffer[512];
-            memcpy(outgoing_buffer, &outgoing, sizeof(outgoing));
-            send(ret, outgoing_buffer, sizeof(outgoing_buffer), 0);
-            // message incming_msg;
-            // int n = read(new_socket, (void*)&incming_msg, 512);
-            // if(incming_msg.funcID==4){
-            //     cout<<"MSG"<<endl;
-            //     cnct(new_socket,&incming_msg);
-            //     //write(new_socket, (void*)&incming_msg, 512);
-            //     continue;
-            // }
-            // cout << n << endl;
-            //add_fd_to_monitoring(new_socket);
-            //gotmsg(&incming_msg);
+            cout << "\033[1;36m"; // print in color
+            cout << "Got " << message_type(incoming) << " message type!" << endl;
+            cout << "\033[0m"; // end print in color
+            if (incoming->funcID == 4) {
+                cnct(ret, incoming);
+                continue;
+            }
+            //gotmsg(incoming);
             delete(incoming);
         }
 	}
@@ -199,7 +196,6 @@ void ack(message * msg){//,int messagenum){
 }
 
 void nack(int messagenum){
-
     int msgid=5;
     message ack;
     ack.id=msgid;
@@ -217,6 +213,17 @@ void cnct(const unsigned int new_socket, message * msg){
     sockets.insert(make_pair(msg->src,new_socket));
     add_fd_to_monitoring(new_socket);
     write(new_socket,&rply,sizeof(rply));
+}
+
+string message_type(message* msg) {
+    if (msg->funcID==1) return "Ack";
+    else if (msg->funcID==2) return "Nack";
+    else if (msg->funcID==4) return "Connect";
+    else if (msg->funcID==8) return "Discover";
+    else if (msg->funcID==16) return "Route";
+    else if (msg->funcID==32) return "Send";
+    else if (msg->funcID==64) return "Relay";
+    return "(Can not identify)";
 }
 void discover(int message_num){};
 void route(int message_num,int length,int * way){}

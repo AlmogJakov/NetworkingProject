@@ -1,4 +1,6 @@
 #pragma once
+using namespace std;
+
 typedef struct packetMSG {
     int id;
     int src;
@@ -43,3 +45,6 @@ void Send(int length,char*);
 // 2. Number of subsequent messages that has to be relayed (seconds 4 bytes in payload).
 // Returns Func: ack or nack
 void relay(int message_num);
+
+// returns the type name of the message
+string message_type(message* msg);
