@@ -8,22 +8,22 @@
 #include <string.h>
 #include <sys/types.h>
 #include <time.h>
-#include <netdb.h> // addrinfo
-#include <list>
+#include <netdb.h> /* addrinfo */
+
 #include <map>
 #include <unordered_map>
 #include <iostream>
 #include <string>
 #include <vector>
 #include <sstream>
-#include <numeric>
+
 #include "select.hpp"
 #include "node.hpp"
 
 int id; /* my id */
 unordered_map<int,const unsigned int> sockets;
 unordered_map<int,int> msgs;
-unordered_map<int,list<int>> waze;
+
 //message * main_msg;
 int main(int argc, char *argv[]) {
     int innerfd = 0, outerfd=0;
@@ -143,18 +143,11 @@ void std_send(stringstream& ss,string splited[]) {
     getline(ss,splited[1],','); /* destination */
     getline(ss,splited[2],','); /* message length */
     getline(ss,splited[3],','); /* message itself */
-//    if(waze.find(splited[1])==waze.end()){
-//        send_discover();
-//    }
-//
-//    for(int i = 0; i < waze[splited[1]].size(); ++i) {
-//
-//    }
     message outgoing;
     outgoing.id = rand();
     outgoing.src = id;
     outgoing.dest = stoi(splited[1]);
-    outgoing.trailMSG = waze[splited[1]].size();
+    outgoing.trailMSG = 0;
     outgoing.funcID = 32; /* send function id is 32 */
     memcpy(outgoing.payload, splited[3].c_str(), stoi(splited[2])); /* set the payload */
     char outgoing_buffer[512];
@@ -178,7 +171,7 @@ void gotmsg(message* msg, int ret){
            cnct(msg, ret);
            break;}
         case 8:{ /* DISCOVER */
-            discover(ret,msg->dest);
+            discover(msg->dest);
             break;}
         case 16:{ /* ROUTE */
             break;}
@@ -187,12 +180,6 @@ void gotmsg(message* msg, int ret){
             break;}
         case 64: { /* RELAY */
             break;}
-    }
-}
-
-            break;
-        }
-        case 64:{break;}
     }
 }
 
@@ -226,8 +213,6 @@ void cnct(message* msg, int ret){
     write(ret,&rply,sizeof(rply));
 }
 
-
-
 /* ---------------------------------- SEND -------------------------------------- */
 void Send(message* msg, int ret) {
     cout << msg->payload << endl;
@@ -242,79 +227,11 @@ void Send(message* msg, int ret) {
 }
 
 /* -------------------------------- DISCOVER ------------------------------------ */
-void discover(int ret,message * msg){
-    int dest,num_sent,init_id;
-    message * reply;
-    memcpy(&dest,msg->payload,sizeof(int));
-    msgs.emplace(msg->id,msg->src);
-    memcpy(&init_id,msg->payload+2*sizeof(int),sizeof(int));
-    memcpy(&num_sent,msg->payload+sizeof(int),sizeof(int));
-    msgs.emplace({init_id,msg->src});
-    list<int> visited;
-    read(ret,&visited,(sizeof(int)*num_sent))
-    if(sockets.find(dest)!=sockets.end()){
-        reply->id=random();
-        reply->src=id;
-        reply->funcID=16;
-        reply->dest=msg->src;
-        memcpy(&reply->payload, &msg->id, sizeof(int));
-        //reply->payload[5]=2;
-        memcpy(reply->payload + sizeof(int), (char*)2, sizeof(int));
-        memcpy(reply->payload + 2*sizeof(int), (char*)&id, sizeof(int));
-        memcpy(reply->payload + 3*sizeof(int), (char*)&dest, sizeof(int));
-        write(sockets.at(reply->dest),&reply,sizeof(&reply));
-        //wait_for_input();
-    }
-    else{
-        for(auto & neighbor:sockets){
-            if(neighbor.first!=msg->src){
-                send_discover(msg,neighbor.first);
-                //msgs.emplace({msg->id,msg->src});
-            }
-        }
-    }
-};
+void discover(int message_num){};
 /* --------------------------------- ROUTE -------------------------------------- */
-void route(message* msg,int message_num,int length,int * way){
-   if(length<waze[msg->src].size()){
-       waze[msg->src].clear();
-       for(int i=0;i<length;i++){
-           waze.at(msg->src).push_back(way[i]);
-       }
-   }
-   else {
-       if (accumulate(way, way + length, 0) < accumulate(waze[msg->src].begin(), waze[msg->src].end(), 0)) {
-           waze[msg->src].clear();
-           for (int i = 0; i < length; i++) {
-               waze.at(msg->src).push_back(way[i]);
-           }
-       }
-   }
-   message * reply;
-   int f_msg;
-   memcpy(&f_msg,msg->payload,sizeof(int));
-   reply->src=id;
-   reply->dest=msgs[f_msg];
-
-}
+void route(int message_num,int length,int * way){}
 /* --------------------------------- RELAY -------------------------------------- */
-
-void relay(int message_num,message * msg){
-    message* relay;
-    int ret;
-    int dest;
-    if(msg->dest!=id){
-        send_nack(msg);
-    }
-    else{
-        for(int i=0;i<msg->trailMSG;i++) {
-           // ret=wait_for_input();
-            read(ret, &relay, 512);
-            memcpy(relay->payload,&dest,sizeof(int));
-            write(sockets.at(dest),&relay,sizeof(relay));
-        }
-    }
-};
+void relay(int message_num){};
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////// GLOBAL METHODS //////////////////////////////////
@@ -330,39 +247,3 @@ string message_type(message* msg) {
     else if (msg->funcID==64) return "Relay";
     return "(Can not identify)";
 }
-
-void send_nack(message * msg){}
-void send_ack(message * msg){
-    auto* rply=new message;
-    rply->id=random();
-    rply->src=id;
-    rply->dest=msg->src;
-    rply->trailMSG=msg->trailMSG==0?0:msg->trailMSG-1;
-    rply->funcID=1;
-    memcpy(rply->payload, (char*)&msg->id,sizeof(int));
-    write(sockets.at(msg->src),&rply,sizeof(rply));
-    delete rply;
-    //rply->payload=(char*)msg->id;
-}
-
-void send_discover(message * msg,int dest,int * visited){
-    message *disc;
-    disc->funcID=8;
-    disc->dest=dest;
-    disc->src=id;
-    disc->id=random();
-    msgs.insert({disc->id,msg->src});
-    memcpy(&disc->payload,msg->payload,sizeof(int));
-    int num_sent;
-    memcpy()
-    memcpy(&disc->payload+sizeof(int),)
-    write(sockets[disc->dest],&disc,sizeof(&disc));
-}
-//void discover(int message_num){};
-//void route(int message_num,int length,int * way){}
-//void Send(int length,char*){}
-//void relay(int message_num){};
-//
-
-
-
