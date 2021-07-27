@@ -9,10 +9,10 @@ typedef struct packetMSG {
     int funcID;
     char payload[492] = {0};
 }message;
-void gotmsg(message* msg);
+void gotmsg(message* msg, int ret);
 // Parameters: The message number on it Sent the ack (4 bytes First in payload)
 // Returns Func: none
-void ack(message* msg);
+void ack(message* msg, int ret);
 
 // Parameters: The message number on it Sent the nack (4 bytes First in payload)
 // Returns Func: none
@@ -21,7 +21,7 @@ void nack(int message_num);
 // Parameters: none
 // Returns Func: ack or nack
 //void Cnct();
-void cnct(const unsigned int new_socket, message * msg);
+void cnct(message* msg, int ret);
 // Parameters: Destination Junction (4 bytes First in payload)
 // Returns Func: none
 void discover(int message_num);
@@ -38,7 +38,7 @@ void route(int message_num,int length,int * way);
 // 1. The length of the message (4 First bytes in payload of The first message Only).
 // 2. The message itself (Starting from The fifth byte)
 // Returns Func: ack or nack
-void Send(int length,char*);
+void Send(message* msg, int ret);
 
 // Parameters:
 // 1. next node In the path (4 First bytes in payload).
@@ -48,3 +48,7 @@ void relay(int message_num);
 
 // returns the type name of the message
 string message_type(message* msg);
+
+void std_setid(stringstream& ss,string splited[]);
+void std_send(stringstream& ss,string splited[]);
+void std_connect(stringstream& ss,string splited[]);
