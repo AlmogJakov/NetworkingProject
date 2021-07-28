@@ -16,7 +16,7 @@ void ack(message* msg, int ret);
 
 // Parameters: The message number on it Sent the nack (4 bytes First in payload)
 // Returns Func: none
-void nack(int message_num);
+void nack(message* msg, int ret);
 
 // Parameters: none
 // Returns Func: ack or nack
@@ -24,7 +24,7 @@ void nack(int message_num);
 void cnct(message* msg, int ret);
 // Parameters: Destination Junction (4 bytes First in payload)
 // Returns Func: none
-void discover(int message_num);
+void discover(message* msg, int ret);
 
 // Parameters:
 // 1. Message number - discover the original (4 first bytes In payload)
@@ -52,3 +52,7 @@ string message_type(message* msg);
 void std_setid(stringstream& ss,string splited[]);
 void std_send(stringstream& ss,string splited[]);
 void std_connect(stringstream& ss,string splited[]);
+
+void send_nack(message* msg);
+void send_ack(message* msg);
+void send_discover(int dst);
