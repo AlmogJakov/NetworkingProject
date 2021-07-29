@@ -32,7 +32,7 @@ void discover(message* msg, int ret);
 //     in extent And no route was found The length of the answer will be 0.
 // 3. The nodes in sending order (4 bytes per node).
 // Returns Func: none
-void route(int message_num,int length,int * way);
+void route(message* msg, int ret);
 
 // Parameters:
 // 1. The length of the message (4 First bytes in payload of The first message Only).
@@ -55,4 +55,4 @@ void std_connect(stringstream& ss,string splited[]);
 
 void send_nack(message* msg);
 void send_ack(message* msg);
-void send_discover(int dst);
+void send_discover(int dst, int discover_id);
