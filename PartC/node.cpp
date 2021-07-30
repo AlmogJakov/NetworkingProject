@@ -225,7 +225,6 @@ void std_send(stringstream& ss,string splited[]) {
                 cout << "inserting " << nei.first << " to first_src_neis list.." << endl;
                 first_src_neis[stoi(splited[1])].insert(nei.first);
             }
-
             send_discover(stoi(splited[1]),original_id);}
         else {
 
@@ -289,7 +288,7 @@ void nack(message* msg, int ret) {
             } else { /* returned to source node. finish! */
                 if (waze.count(discover_id)!=0) { /* if found path print it! */
                     int len = waze[destination].size();
-                    cout << "path: ";
+                    cout << "path: " << id << "->";
                     for (int i = 0; i < len-1; i++) {
                         cout << waze[destination][i] << "->";
                     }
@@ -387,21 +386,18 @@ void route(message* msg, int ret) {
     int length;
     memcpy(&length, msg->payload+(1)*sizeof(int), sizeof(int)); /* save path length from msg payload */
     vector<int> way;
-    cout << "updating path from route message.." << endl;
-    way.push_back(id);
     for (int i = 0; i < length; i++) {
         int element;
         memcpy(&element, msg->payload+(2+i)*sizeof(int), sizeof(int));
         way.push_back(element);
     }
-    length++;
     int destination = way[length-1];
     if(waze.count(destination)==0||length<waze[destination].size()){
         waze[destination].clear();
         for(int i=0;i<length;i++){
             waze[destination].push_back(way[i]);
         }
-    } else if (length==waze[destination].size()) { // there is a path & 
+    } else if (length==waze[destination].size()) { // there is a path
         if (accumulate(way.begin(),way.end(),0)<accumulate(waze[destination].begin(),waze[destination].end(), 0)) {
             waze[destination].clear();
             for (int i = 0; i < length; i++) {
@@ -419,7 +415,7 @@ void route(message* msg, int ret) {
             return;
         } else { /* we visited all the nodes & returned to source node. finish! */
             int len = waze[destination].size();
-            cout << "path: ";
+            cout << "path: " << id << "->";
             for (int i = 0; i < len-1; i++) {
                 cout << waze[destination][i] << "->";
             }
