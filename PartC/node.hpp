@@ -44,7 +44,7 @@ void Send(message* msg, int ret);
 // 1. next node In the path (4 First bytes in payload).
 // 2. Number of subsequent messages that has to be relayed (seconds 4 bytes in payload).
 // Returns Func: ack or nack
-void relay(int message_num);
+void relay(message* msg, int ret);
 
 // returns the type name of the message
 string message_type(message* msg);
@@ -57,3 +57,4 @@ void send_nack(message* msg);
 void send_ack(message* msg);
 void send_route(message* msg);
 void send_discover(int dst, int discover_id);
+void send_relay(int destination,int original_id);

@@ -39,6 +39,13 @@
 |                                                | FIRST DISCOVER ID | PATH LEN | PATH . . .  |
 |_____________________________________________________________________________________________|
 
+~   ~   ~   ~   ~   ~   ~   ~   ~ RELAY HEADER ~   ~   ~   ~   ~   ~   ~   ~   ~
+ _____________________________________________________________________________________________
+| MSG ID | SRC ID | DST ID | TRAIL MSG | FUNC ID |                  PAYLOAD                   |
+|---------------------------------------------------------------------------------------------|
+|                                                | NEXT NODE ID | NUM OF MESSAGES TO SEND |   |
+|_____________________________________________________________________________________________|
+
 ~   ~   ~   ~   ~   ~   ~   ~   DISCOVER HEADER   ~   ~   ~   ~   ~   ~   ~   ~
  _______________________________________________________________________________________
 | MSG ID | SRC ID | DST ID | TRAIL MSG | FUNC ID |               PAYLOAD                |
@@ -60,6 +67,8 @@ int id;
 /* key - neighbor id. value - socket. */
 unordered_map<int,const unsigned int> sockets;
 /* Note! to get the neighbors we can iterate thru this map keys. */
+
+unordered_map<int,string> text;
 
 /* save path to each node */
 unordered_map<int,vector<int>> waze;
@@ -257,6 +266,7 @@ void gotmsg(message* msg, int ret){
             Send(msg, ret);
             break;}
         case 64: { /* RELAY */
+            relay(msg, ret);
             break;}
     }
 }
@@ -293,6 +303,7 @@ void nack(message* msg, int ret) {
                         cout << waze[destination][i] << "->";
                     }
                     cout << waze[destination][len-1] << endl;
+                    send_relay(destination,discover_id);
                 } else {
                     cout << "sorry, didnt find path! :(" << endl;
                 }
@@ -420,6 +431,7 @@ void route(message* msg, int ret) {
                 cout << waze[destination][i] << "->";
             }
             cout << waze[destination][len-1] << endl;
+            send_relay(destination,discover_id);
             //node_to_reply.erase(discover_id);
             return;
         }
@@ -437,7 +449,17 @@ void route(message* msg, int ret) {
 }
 
 /* --------------------------------- RELAY -------------------------------------- */
-void relay(int message_num){};
+void relay(message* msg, int ret){
+    int trail,dest,src;
+    memcpy(&trail, &msg->trailMSG, sizeof(int));
+    memcpy(&dest,&msg->payload,sizeof(int));
+    memcpy(&src,&msg->src,sizeof(int));
+//    char pipe[512*trail];
+//    read(sockets[src],&pipe,sizeof(pipe));
+   // void * pipe;
+    //read(sockets[src],&pipe,512*trail);
+    write(sockets[dest],&sockets[src],512*trail);
+};
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////// GLOBAL METHODS //////////////////////////////////
@@ -473,7 +495,7 @@ void send_route(message *msg) {
         memcpy(rply.payload + sizeof(int), &path_length, sizeof(int));
         memcpy(rply.payload + 2*sizeof(int), (&id), sizeof(int));
         memcpy(rply.payload + 3*sizeof(int), &destination, sizeof(int));
-        cout << "1) got " << msg->funcID << " msg. sending " << rply.funcID << " msg to " << destination << endl;
+        cout << "1) got " << msg->funcID << " msg. sending " << rply.funcID << " msg to " << node_to_reply[discover_id].first << endl;
         write(sockets[rply.dest], &rply, sizeof(rply));
         return;
     } else if (msg->funcID == 2) {
@@ -582,4 +604,38 @@ void send_discover(int dst, int discover_id) { /* first discover from the termin
     
     cout << "discovering to " << first_nei << endl;
     send(sockets[first_nei], outgoing_buffer, sizeof(outgoing_buffer), 0);
+}
+
+
+void send_relay(int destination,int original_id) {
+    int length=waze[destination].size();
+    char pipe[512*(length)];
+    message relays;
+    relays.funcID=64;
+    int msg_id=random();
+    /* starting from 1 to length-1.
+       from 1 because the first message is read by the first node to which it is sent
+       to length-1 because the last message is "send" message and not "relay" message */
+    for (int i = 1; i < length-1; ++i) {
+        relays.id=msg_id+i;
+        relays.src=id;
+        relays.dest=waze[destination][i];
+        relays.trailMSG=length-i;
+        int len = length-i;
+        memcpy(relays.payload,&waze[destination][i+1],sizeof(int));
+        memcpy(relays.payload+sizeof(int),&len,sizeof(int));
+        memcpy(pipe+((i-1)*sizeof(relays)),&relays,sizeof(relays));
+    }
+    message msg;
+    msg.src=id;
+    msg.dest=destination;
+    msg.trailMSG=0;
+    msg.funcID=32;
+    int txt_length;
+    txt_length=strlen(text[original_id].c_str());
+    memcpy(msg.payload,&length,sizeof(int));
+    memcpy(msg.payload+sizeof(int),text[original_id].c_str(),length);
+    memcpy(pipe+(length-1)*sizeof(message),&msg,sizeof(msg));
+    int dest=waze[destination][0];
+    write(sockets[dest],&pipe,sizeof(pipe));
 }
