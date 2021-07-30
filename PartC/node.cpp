@@ -129,9 +129,10 @@ int main(int argc, char *argv[]) {
             else if (splited[0].compare("connect")==0) {std_connect(ss,splited);}
             else if (splited[0].compare("send")==0) {std_send(ss,splited);}
         } else { /* we got a packet */
-            int addrlen;
+            socklen_t addrlen;
+            addrlen = sizeof(serv_addr);
             if (ret==innerfd) { /* if ret==innerfd then we got a new connection! */
-                if ((ret = accept(ret, (struct sockaddr *)&serv_addr, (socklen_t*)&addrlen))<0) {
+                if ((ret = accept(ret, (struct sockaddr *)&serv_addr, &addrlen))<0) {
                     perror("accept");
                     exit(EXIT_FAILURE);
                 }
@@ -224,6 +225,7 @@ void std_send(stringstream& ss,string splited[]) {
                 cout << "inserting " << nei.first << " to first_src_neis list.." << endl;
                 first_src_neis[stoi(splited[1])].insert(nei.first);
             }
+
             send_discover(stoi(splited[1]),original_id);}
         else {
 
@@ -285,22 +287,32 @@ void nack(message* msg, int ret) {
                 send_discover(destination,discover_id);
                 return;
             } else { /* returned to source node. finish! */
-                return;
+                if (waze.count(discover_id)!=0) { /* if found path print it! */
+                    int len = waze[destination].size();
+                    cout << "path: ";
+                    for (int i = 0; i < len-1; i++) {
+                        cout << waze[destination][i] << "->";
+                    }
+                    cout << waze[destination][len-1] << endl;
+                } else {
+                    cout << "sorry, didnt find path! :(" << endl;
+                }
             }
         } else { /* were on inner node! */
             my_stack[discover_id].erase(msg->src); /* remove the current node from neighbors */
             if (my_stack[discover_id].size()>0) { /* there are more neighbors. keep discovering! */
                 send_discover(destination,discover_id);
                 return;
+            } else { /* done searching! */
+                /* lets check if we found path */
+                if (waze.count(discover_id)!=0) { /* found path! */
+                    cout << "done searching! should return route!" << endl;
+                    send_route(msg);
+                } else { /* done searching! but didnt find path :( */
+                    cout << "done searching! should return nack!" << endl;
+                    send_nack(msg);
+                }
             }
-        }
-        /* lets check if we found path */
-        if (waze.count(discover_id)!=0) { /* found path! */
-            cout << "done searching! should return route!" << endl;
-            send_route(msg);
-        } else { /* done searching! but didnt find path :( */
-            cout << "done searching! should return nack!" << endl;
-            send_nack(msg);
         }
     }
 }
@@ -339,32 +351,33 @@ void discover(message* msg, int ret) {
     int discover_id;
     memcpy(&destination, msg->payload, sizeof(int)); /* save destination from msg payload */
     memcpy(&discover_id, msg->payload+sizeof(int), sizeof(int)); /* save discover_id from msg payload */
-    node_to_reply.insert({discover_id,{msg->src,msg->id}});
+    /* circle! cannot continue discovering! */
+    if ((node_to_reply[discover_id].first!=-1&&my_stack[discover_id].size()>0)
+            ||(node_to_reply[discover_id].first==-1&&first_src_neis[destination].size()>0)) {
+        cout <<  msg->src <<" send to me (my id:" << id << ") and closed circle! return nack" << endl;
+        send_nack(msg);
+        return;
+    }
+    /* update node_to_reply (overwrite if exists) */
+    node_to_reply[discover_id] = {msg->src,msg->id};
     if (sockets.find(destination)!=sockets.end()) { /* if destination is a neighbor we found the node! */
         cout << "found the socket " << destination << "! return route" << endl;
         send_route(msg);
-    } else if ((node_to_reply[discover_id].first!=-1&&my_stack[discover_id].size()>0)
-            ||(node_to_reply[discover_id].first==-1&&first_src_neis[destination].size()>0)
-            ||sockets.size()==1) { /* circle or leaf! cannot continue discovering! */
-        if (sockets.size()==1) {
-            cout << "i am a leaf! return nack!" << endl;
-        } else {
-            cout <<  msg->src <<" send to me (my id:" << id << ") and closed circle! return nack" << endl;
-        }
+    } else if (sockets.size()==1) { /* leaf! cannot continue discovering! */
+        cout << "i am a leaf! return nack!" << endl;
         send_nack(msg);
-        return;
     } else { /* we can continue discovering */
-            cout << "continue discovering" << endl;
-            /* add all neighbors to my_stack & keep discovering forward (to random neighbor) */
-            for(auto nei : sockets) { 
-                /* if a node sent us discover message we would not want
-                   to return to this node a discover message */
-                if (nei.first!=msg->src) {
-                    my_stack[discover_id].insert(nei.first);
-                    cout << "adding " << nei.first << " to my stack" << endl;
-                }
+        cout << "continue discovering" << endl;
+        /* add all neighbors to my_stack & keep discovering forward (to random neighbor) */
+        for(auto nei : sockets) { 
+            /* if a node sent us discover message we would not want
+               to return to this node a discover message */
+            if (nei.first!=msg->src) {
+                my_stack[discover_id].insert(nei.first);
+                cout << "adding " << nei.first << " to my stack" << endl;
             }
-            send_discover(destination,discover_id);
+        }
+        send_discover(destination,discover_id);
     }
 }
 
@@ -399,6 +412,7 @@ void route(message* msg, int ret) {
     int discover_id;
     memcpy(&discover_id, msg->payload, sizeof(int));
     if (node_to_reply[discover_id].first==-1) { /* were on source node! */
+        cout << "src node.." << endl;
         first_src_neis[destination].erase(msg->src); /* remove the current node from neighbors */
         if (first_src_neis[destination].size()>0) { /* there are more neighbors. keep discovering! */
             send_discover(destination,discover_id);
@@ -410,14 +424,17 @@ void route(message* msg, int ret) {
                 cout << waze[destination][i] << "->";
             }
             cout << waze[destination][len-1] << endl;
+            //node_to_reply.erase(discover_id);
             return;
         }
     } else { /* were on inner node! */
+        cout << "inner node.." << endl;
         my_stack[discover_id].erase(msg->src); /* remove the current node from neighbors */
         if (my_stack[discover_id].size()>0) { /* there are more neighbors. keep discovering! */
             send_discover(destination,discover_id);
             return;
         } else { /* should return route to prev node */
+            cout << "sending route.." << endl;
             send_route(msg);
         }
     }
@@ -447,7 +464,7 @@ string message_type(message* msg) {
 void send_route(message *msg) {
     int discover_id, destination, length;
     message rply;
-    msg->id = random();
+    rply.id = random();
     rply.src = id;
     rply.funcID = 16;
     rply.trailMSG = 0;
@@ -460,19 +477,22 @@ void send_route(message *msg) {
         memcpy(rply.payload + sizeof(int), &path_length, sizeof(int));
         memcpy(rply.payload + 2*sizeof(int), (&id), sizeof(int));
         memcpy(rply.payload + 3*sizeof(int), &destination, sizeof(int));
+        cout << "1) got " << msg->funcID << " msg. sending " << rply.funcID << " msg to " << destination << endl;
         write(sockets[rply.dest], &rply, sizeof(rply));
         return;
     } else if (msg->funcID == 2) {
         memcpy(&discover_id, msg->payload + 3 * sizeof(int), sizeof(int));//get discover_id
         memcpy(&destination, msg->payload + 4 * sizeof(int), sizeof(int));//get destination
+        cout << "2) got " << msg->funcID << " msg. sending " << rply.funcID << " msg to " << node_to_reply[discover_id].first << endl;
     } else if (msg->funcID == 16) {
         memcpy(&discover_id, msg->payload, sizeof(int));
         memcpy(&length, msg->payload + sizeof(int), sizeof(int));
         memcpy(&destination, msg->payload + (2 + length - 1) * sizeof(int),
                sizeof(int));//destination is the last in the path
+        cout << "3) got " << msg->funcID << " msg. sending " << rply.funcID << " msg to " << node_to_reply[discover_id].first << endl;
     }
     length = waze[destination].size() +1;//the path exists beacuse it was added in route function,the +1 is the current node
-    memcpy(&rply.payload, &discover_id, sizeof(int));//adding original id to the payload
+    memcpy(rply.payload, &discover_id, sizeof(int));//adding original id to the payload
     memcpy(rply.payload + sizeof(int), &length, sizeof(int));//adding length to the payload
     memcpy(rply.payload + 2 * sizeof(int), &id, sizeof(int));//adding current node to path
     rply.dest = node_to_reply[discover_id].first;
@@ -480,12 +500,15 @@ void send_route(message *msg) {
     int node_id;
     for (int i = 0; i < length - 1; ++i) {
         node_id = *it++;
-        memcpy(&rply.payload + (i + 3) * sizeof(int), &node_id, sizeof(int));
+        memcpy(rply.payload + (i + 3) * sizeof(int), &node_id, sizeof(int));
     }
-    write(sockets[rply.dest], &rply, sizeof(&rply));
+    //node_to_reply.erase(discover_id);
+    cout << "sending route to " << rply.dest << endl;
+    write(sockets[rply.dest], &rply, sizeof(rply));
 }
 
 void send_nack(message* msg) {
+    int destination, discover_id;
     message rply; /* nack */
     rply.id=random();
     rply.src=id;
@@ -497,8 +520,6 @@ void send_nack(message* msg) {
         memcpy(&nack_type, msg->payload+sizeof(int), sizeof(int));
         /* read and write data to payload in accordance to the nack type */
         if (nack_type==8) {
-            int discover_id;
-            int destination;
             memcpy(&discover_id, msg->payload+2*sizeof(int), sizeof(int));
             memcpy(&destination, msg->payload+3*sizeof(int), sizeof(int));
             int prev_node = node_to_reply[discover_id].first;
@@ -511,10 +532,9 @@ void send_nack(message* msg) {
         }
     } else if (msg->funcID==8) { /* need to return nack for discover message */
         int nack_type = 8;
-        int destination;
-        int discover_id;
         memcpy(&destination, msg->payload, sizeof(int));
         memcpy(&discover_id, msg->payload+sizeof(int), sizeof(int));
+        rply.dest = msg->src;
         /* write to the new message */
         memcpy(rply.payload, &rply.dest,sizeof(int));
         memcpy(rply.payload+1*sizeof(int), &nack_type,sizeof(int));
@@ -523,7 +543,8 @@ void send_nack(message* msg) {
     } else { /* TODO: else if nack_type==64 (relay) */
         memcpy(rply.payload, &msg->id,sizeof(int));
     }
-    
+    //node_to_reply.erase(discover_id);
+    cout << "sending nack to " << rply.dest << endl;
     write(sockets[rply.dest],&rply,sizeof(rply));
 }
 
