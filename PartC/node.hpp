@@ -55,4 +55,5 @@ void std_connect(stringstream& ss,string splited[]);
 
 void send_nack(message* msg);
 void send_ack(message* msg);
+void send_route(message* msg);
 void send_discover(int dst, int discover_id);
