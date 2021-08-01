@@ -74,6 +74,13 @@
 |                                                | LAST MSG ID | FUNC ID TO NACK TO | GENERAL REQUEST ID | DEST |
 |_______________________________________________________________________________________________________________|
 
+~   ~   ~   ~   ~   ~   ~   ~   SEND HEADER   ~   ~   ~   ~   ~   ~   ~   ~
+ _____________________________________________________________________________________________
+| MSG ID | SRC ID | DST ID | TRAIL MSG | FUNC ID |                  PAYLOAD                   |
+|---------------------------------------------------------------------------------------------|
+|                                                | TEXT LEN | TEXT . . . | GENERAL REQUEST ID |
+|_____________________________________________________________________________________________|
+
 */
 
 /* my id */
@@ -430,12 +437,17 @@ void cnct(message* msg, int ret){
 /* ---------------------------------- SEND -------------------------------------- */
 void Send(message* msg, int ret) {
     int length;
+    int trail;
     memcpy(&length, &msg->payload, sizeof(int));
+    memcpy(&trail, &msg->trailMSG, sizeof(int));
     string newString;
     newString.resize(length);
     memcpy((char*)newString.data(), msg->payload+sizeof(int), length);
     //memcpy(&text, msg->payload, length);
     cout << "getting len: " << length << ". msg: " << newString << endl;
+    if (trail>0) {
+        return;
+    }
     message rply; /* ack */
     rply.id=random();
     rply.src=id;
