@@ -29,14 +29,13 @@ static int add_fd_to_monitoring_internal(const unsigned int fd) {
 }
 
 static int remove_fd_from_monitoring_internal(const unsigned int fd) {
+  close(fd);
   int new_alloced_fds_num = alloced_fds_num-1;
   int arr[new_alloced_fds_num];
-  int i = 0;
   /* backup all the sockets except from fd */
-  while (i<new_alloced_fds_num) {
+  for (int i = 0, j = 0; i < alloced_fds_num; i++) {
     if (alloced_fds[i]!=fd) {
-      arr[i] = alloced_fds[i];
-      i++;
+      arr[j++] = alloced_fds[i];
     }
   }
   /* init values */

@@ -166,6 +166,7 @@ int main(int argc, char *argv[]) {
 		                sockets.erase(it->first);
 		                break;}
                 }
+                cout << "socket " << ret << " removed" << endl;
                 /* remove the socket from monitoring! */
                 remove_fd_from_monitoring(ret);
                 continue;
