@@ -365,7 +365,7 @@ void nack(message* msg, int ret) {
                 send_discover(destination,discover_id);
                 return;
             } else { /* returned to source node. finish! */
-                if (waze.count(discover_id)!=0) { /* found path! */
+                if (waze.count(destination)!=0) { /* found path! */
                     /* there is text to send so discover called by relay! call relay! */
                     if (!text[destination].empty()) {
                         send_relay(destination,discover_id);
@@ -377,7 +377,7 @@ void nack(message* msg, int ret) {
                         }
                         cout << waze[destination][len-1] << endl;
                     }
-                } else {
+                } else { /* didnt found path */
                     cout << "sorry, didnt find path! :(" << endl;
                 }
             }
@@ -508,16 +508,20 @@ void route(message* msg, int ret) {
             send_discover(destination,discover_id);
             return;
         } else { /* we visited all the nodes & returned to source node. finish! */
-            /* if there is text to send so discover called by relay! call relay! */
-            if (!text[destination].empty()) {
-                send_relay(destination,discover_id);
-            } else { /* discover called by route! print the path! */
-                int len = waze[destination].size();
-                cout << "path: " << id << "->";
-                for (int i = 0; i < len-1; i++) {
-                    cout << waze[destination][i] << "->";
+            if (waze.count(destination)!=0) { /* found path! */
+                /* there is text to send so discover called by relay! call relay! */
+                if (!text[destination].empty()) {
+                    send_relay(destination,discover_id);
+                } else { /* discover called by route! print the path! */
+                    int len = waze[destination].size();
+                    cout << "path: " << id << "->";
+                    for (int i = 0; i < len-1; i++) {
+                        cout << waze[destination][i] << "->";
+                    }
+                    cout << waze[destination][len-1] << endl;
                 }
-                cout << waze[destination][len-1] << endl;
+            } else { /* didnt found path */
+                cout << "sorry, didnt found path! :(" << endl;
             }
             //node_to_reply.erase(discover_id);
             return;
