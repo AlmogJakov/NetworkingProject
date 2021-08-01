@@ -361,7 +361,18 @@ void ack(message* msg, int ret){//,int messagenum){
        therfore add the socket to connected sockets list! */
     if (ack_type==4) { /* respond to a connect message */
         sockets[msg->src] = ret;
+        cout<<"Ack"<<endl;
         //sockets.insert({msg->src,ret});
+    }
+    if(ack_type==32){
+        int general_request_id;
+        memcpy(&general_request_id,msg->payload+2*sizeof(int),sizeof(int));
+        if(node_to_reply[general_request_id]==-1){
+            cout<<"Ack"<<endl;
+        }
+        else{
+            send_ack(msg);
+        }
     }
 }
 
@@ -413,8 +424,15 @@ void nack(message* msg, int ret) {
                 }
             }
         }
-    } else if (nack_type==64) { /* TODO: got nack for relay function! */
-
+    } else if (nack_type==64||nack_type==32) {
+        int general_request_id;
+        memcpy(&general_request_id,msg->payload+2*sizeof(int),sizeof(int));
+        if(node_to_reply[general_request_id]==-1){
+            cout<<"Nack"<<endl;
+        }
+        else{
+            send_nack(msg);
+        }
     }
 }
 
@@ -444,18 +462,28 @@ void Send(message* msg, int ret) {
     newString.resize(length);
     memcpy((char*)newString.data(), msg->payload+sizeof(int), length);
     //memcpy(&text, msg->payload, length);
-    cout << "getting len: " << length << ". msg: " << newString << endl;
-    if (trail>0) {
-        return;
+    cout << "getting len: " << length << ". msg: " << newString;// << endl;
+    while(trail>=0) {
+       // char pipe[512*trail];
+        read(ret,&msg,sizeof(msg));
+        newString.resize(length);
+        memcpy((char*)newString.data(), msg->payload+sizeof(int), length);
+        cout<<newString;
+        trail--;
+        //write(sockets[dest],&pipe,512*trail);
+       // return;
     }
-    message rply; /* ack */
-    rply.id=random();
-    rply.src=id;
-    rply.dest=msg->src;
-    memcpy(rply.payload, (char*)&msg->id,sizeof(int));
-    rply.trailMSG=0;
-    rply.funcID=1;
-    write(ret,&rply,sizeof(rply));
+    cout<<endl;
+    send_ack(msg);
+
+//    message rply; /* ack */
+//    rply.id=random();
+//    rply.src=id;
+//    rply.dest=msg->src;
+//    memcpy(rply.payload, (char*)&msg->id,sizeof(int));
+//    rply.trailMSG=0;
+//    rply.funcID=1;
+//    write(ret,&rply,sizeof(rply));
 }
 
 /* -------------------------------- DISCOVER ------------------------------------ */
@@ -567,6 +595,10 @@ void relay(message* msg, int ret){
     int trail,dest,src, general_request_id;
     memcpy(&trail, &msg->trailMSG, sizeof(int));
     memcpy(&dest, &msg->payload,sizeof(int));
+    if(sockets.find(dest)== socket().end()){
+        send_nack(msg);
+        return;
+    }
     memcpy(&general_request_id, &msg->payload+2*sizeof(int),sizeof(int));
     memcpy(&src, &msg->src,sizeof(int));
     node_to_reply[general_request_id] = {msg->src,msg->id};
@@ -663,6 +695,17 @@ void send_nack(message* msg) {
             memcpy(rply.payload+2*sizeof(int), &general_request_id,sizeof(int));
             memcpy(rply.payload+3*sizeof(int), &destination,sizeof(int));
         }
+        else{
+            if(nack_type==64){
+               // int message_type;
+                //memcpy(&message_type,msg.payload+sizeof(int),sizeof(int));
+                memcpy(&genral_request_id,msg.payload+2*sizeof(int),sizeof(int));
+                memcpy(&rply->payload,node_to_reply[general_request_id].second,sizeof(int));//adding nack on what message
+                memcpy(&rply->payload+sizeof(int),message_type,sizeof(int));//adding the message type
+                memcpy(&rply->payload+2*sizeof(int),&genral_request_id,sizeof(int));//adding the general request id
+                reply->dest=node_to_reply[genral_request_id].first;
+            }
+        }
     } else if (msg->funcID==8) { /* need to respond to discover message */
         int nack_type = 8;
         memcpy(&destination, msg->payload, sizeof(int));
@@ -674,24 +717,29 @@ void send_nack(message* msg) {
         memcpy(rply.payload+2*sizeof(int), &general_request_id,sizeof(int));
         memcpy(rply.payload+3*sizeof(int), &destination,sizeof(int));
     } else if (msg->funcID==64) { /* TODO: else if nack_type==64 (relay) */
-        memcpy(rply.payload, &msg->id,sizeof(int));
+       // memcpy(&length,msg.payload,sizeof(int));
+        memcpy(&general_request_id,msg.payload+2*sizeof(int),sizeof(int));
+        memcpy(reply->payload,node_to_reply[general_request_id].second,sizeof(int));//writing the last msg id
+        memcpy(reply->payload+sizeof(int),(void*)64,sizeof(int));//writing func id
+        memcpy(reply->payload+2*sizeof(int),&general_request_id,sizeof(int));//writing the gen_r_id
+        reply->dest=node_to_reply[general_request_id].first;
     }
     //node_to_reply.erase(general_request_id);
     cout << "sending nack to " << rply.dest << endl;
     write(sockets[rply.dest],&rply,sizeof(rply));
 }
 
-void send_ack(message* msg){
-    auto* rply=new message;
-    rply->id=random();
-    rply->src=id;
-    rply->dest=msg->src;
-    rply->trailMSG=msg->trailMSG==0?0:msg->trailMSG-1;
-    rply->funcID=1;
-    memcpy(rply->payload, (char*)&msg->id,sizeof(int));
-    write(sockets.at(msg->src),&rply,sizeof(rply));
-    delete rply;
-}
+//void send_ack(message* msg){
+//    auto* rply=new message;
+//    rply->id=random();
+//    rply->src=id;
+//    rply->dest=msg->src;
+//    rply->trailMSG=msg->trailMSG==0?0:msg->trailMSG-1;
+//    rply->funcID=1;
+//    memcpy(rply->payload, (char*)&msg->id,sizeof(int));
+//    write(sockets.at(msg->src),&rply,sizeof(rply));
+//    delete rply;
+//}
 void send_discover(int dst, int general_request_id) { /* first discover from the terminal */
     message outgoing;
     outgoing.id = rand();
@@ -722,12 +770,21 @@ void send_discover(int dst, int general_request_id) { /* first discover from the
 }
 
 void send_relay(int destination,int original_id) {
+    if(sockets.find(waze[destination][0])==sockets.end()){
+        cout<<"Nack"<<endl;
+        return;
+    }
     int length=waze[destination].size();
     char pipe[512*(length)];
     message relays;
     relays.funcID=64;
     int msg_id=random();
     node_to_reply[msg_id] = {-1, -1};
+    int txt_length;
+    txt_length=strlen(text[destination].c_str());
+    int num_of_messages=floor(txt_length/484);
+
+  //  if(splited)
     /* starting from 1 to length-1.
        from 1 because the first message is read by the first node to which it is sent
        to length-1 because the last message is "send" message and not "relay" message */
@@ -736,25 +793,70 @@ void send_relay(int destination,int original_id) {
         relays.src=id;
         relays.dest=waze[destination][i];
         relays.trailMSG=length-i;
-        int len = length-i;
+        int len = length-i+num_of_messages;
         memcpy(relays.payload,&waze[destination][i],sizeof(int));
         memcpy(relays.payload+sizeof(int),&len,sizeof(int));
         memcpy(relays.payload+2*sizeof(int),&msg_id,sizeof(int));
         memcpy(pipe+((i-1)*sizeof(relays)),&relays,sizeof(relays));
     }
+    string txt_to_send = text[destination];
     message msg;
     msg.src=id;
     msg.dest=destination;
-    msg.trailMSG=0;
-    msg.funcID=32;
-    int txt_length;
-    txt_length=strlen(text[destination].c_str());
-    string txt_to_send = text[destination];
-    memcpy(msg.payload,&txt_length,sizeof(int));
+    for(int i=0;i<num_of_messages+1;i++){
+        msg.funcID=32;
+        if(i!=num_of_messages){
+
+            memcpy(msg.payload+sizeof(int),txt_to_send(i*484,i*484+484).c_str(),txt_length);
+            memcpy(msg.payload,(int*)484,sizeof(int));
+            memcpy(msg.payload+484+sizeof(int),msg_id,sizeof(int));
+        }
+        else{
+            memcpy(msg.payload+sizeof(int),txt_to_send(i*484,txt_length).c_str(),txt_length);
+            memcpy(msg.payload,(int*)txt_length%484,sizeof(int));
+            memcpy(msg.payload+txt_length%484+sizeof(int),msg_id,sizeof(int));
+        }
+        memcpy(pipe+(i+length-1)*sizeof(message),&msg,sizeof(msg));
+        bzero(msg);
+    }
+    //msg.trailMSG=0;
+
+  //  memcpy(msg.payload,&txt_length,sizeof(int));
     cout << "sending len: " << txt_length << ". msg: " << txt_to_send << endl;
-    memcpy(msg.payload+sizeof(int),txt_to_send.c_str(),txt_length);
-    memcpy(pipe+(length-1)*sizeof(message),&msg,sizeof(msg));
+    //memcpy(msg.payload+sizeof(int),txt_to_send.c_str(),txt_length);
+    //memcpy(pip+length*)
     int dest=waze[destination][0];
     text[destination].erase(); /* we wrote the text to the message! remove the text from data structure */
     write(sockets[dest],&pipe,sizeof(pipe));
+}
+void send_ack(message *msg){
+    int gen_r_id;
+    message * reply;
+    reply->id=random();
+    reply->src=id;
+    reply->funcID=1;
+    reply->trailMSG=0;
+    if(msg.funcID==32){
+        int length;
+        memcpy(&length,msg.payload,sizeof(int));
+        memcpy(&gen_r_id,msg.payload+sizeof(int)+length,sizeof(int));
+        memcpy(&reply->payload,node_to_reply[gen_r_id].second,sizeof(int));//writing the last msg id
+        memcpy(&reply->payload+sizeof(int),(void*)32,sizeof(int));//writing func id
+        memcpy(&reply->payload+2*sizeof(int),&gen_r_id,sizeof(int));//writing the gen_r_id
+        reply->dest=node_to_reply[gen_r_id].first;
+    }
+    /*
+     * those two are basically the same
+     */
+    if(msg.funcID==1){
+        int message_type;
+        memcpy(&message_type,msg.payload+sizeof(int),sizeof(int));
+        memcpy(&gen_r_id,msg.payload+2*sizeof(int),sizeof(int));
+        memcpy(&reply->payload,node_to_reply[gen_r_id].second,sizeof(int));
+        memcpy(&reply->payload+sizeof(int),message_type,sizeof(int));
+        memcpy(&reply->payload+2*sizeof(int),&gen_r_id,sizeof(int));
+        reply->dest=node_to_reply[gen_r_id].first;
+    }
+    write(sockets[reply->dest],&reply,sizeof(&reply));
+    delete reply;
 }
