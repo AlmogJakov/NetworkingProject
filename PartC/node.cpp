@@ -25,11 +25,18 @@
 
 /* HEADERS:
 
+~   ~   ~   ~   ~   ~   ~   ~   ~ ACK HEADER ~   ~   ~   ~   ~   ~   ~   ~   ~
+ _________________________________________________________________________________________________
+| MSG ID | SRC ID | DST ID | TRAIL MSG | FUNC ID |                     PAYLOAD                    |
+|-------------------------------------------------------------------------------------------------|
+|                                                | LAST MSG ID | FUNC ID TO ACK TO |              |
+|_________________________________________________________________________________________________|
+
 ~   ~   ~   ~   ~   ~   ~   ~   ~ NACK HEADER ~   ~   ~   ~   ~   ~   ~   ~   ~
  _________________________________________________________________________________________________
 | MSG ID | SRC ID | DST ID | TRAIL MSG | FUNC ID |                     PAYLOAD                    |
 |-------------------------------------------------------------------------------------------------|
-|                                                | LAST MSG ID | SRC FUNC ID |                    |
+|                                                | LAST MSG ID | FUNC ID TO NACK TO |             |
 |_________________________________________________________________________________________________|
 
 ~   ~   ~   ~   ~   ~   ~   ~   ~ ROUTE HEADER ~   ~   ~   ~   ~   ~   ~   ~   ~
@@ -40,11 +47,11 @@
 |_____________________________________________________________________________________________|
 
 ~   ~   ~   ~   ~   ~   ~   ~   ~ RELAY HEADER ~   ~   ~   ~   ~   ~   ~   ~   ~
- _____________________________________________________________________________________________
-| MSG ID | SRC ID | DST ID | TRAIL MSG | FUNC ID |                  PAYLOAD                   |
-|---------------------------------------------------------------------------------------------|
-|                                                | NEXT NODE ID | NUM OF MESSAGES TO SEND |   |
-|_____________________________________________________________________________________________|
+ ________________________________________________________________________________________________________
+| MSG ID | SRC ID | DST ID | TRAIL MSG | FUNC ID |                       PAYLOAD                         |
+|--------------------------------------------------------------------------------------------------------|
+|                                                | NEXT NODE ID | NUM OF MESSAGES TO SEND | DISCOVER ID  |
+|________________________________________________________________________________________________________|
 
 ~   ~   ~   ~   ~   ~   ~   ~   DISCOVER HEADER   ~   ~   ~   ~   ~   ~   ~   ~
  _______________________________________________________________________________________
@@ -54,18 +61,18 @@
 |_______________________________________________________________________________________|
 
 ~   ~   ~   ~   ~   ~   ~   ~ DISCOVER NACK HEADER ~   ~   ~   ~   ~   ~   ~   ~
- _________________________________________________________________________________________________
-| MSG ID | SRC ID | DST ID | TRAIL MSG | FUNC ID |                     PAYLOAD                    |
-|-------------------------------------------------------------------------------------------------|
-|                                                | LAST MSG ID | SRC FUNC ID | DISCOVER ID | DEST |
-|_________________________________________________________________________________________________|
+ ________________________________________________________________________________________________________
+| MSG ID | SRC ID | DST ID | TRAIL MSG | FUNC ID |                        PAYLOAD                        |
+|--------------------------------------------------------------------------------------------------------|
+|                                                | LAST MSG ID | FUNC ID TO NACK TO | DISCOVER ID | DEST |
+|________________________________________________________________________________________________________|
 
 */
 
 /* my id */
 int id;
 /* key - neighbor id. value - socket. */
-unordered_map<int,const unsigned int> sockets;
+unordered_map<int,unsigned int> sockets; // const unsigned int
 /* Note! to get the neighbors we can iterate thru this map keys. */
 
 unordered_map<int,string> text;
@@ -137,6 +144,8 @@ int main(int argc, char *argv[]) {
             if (splited[0].compare("setid")==0) {std_setid(ss,splited);}
             else if (splited[0].compare("connect")==0) {std_connect(ss,splited);}
             else if (splited[0].compare("send")==0) {std_send(ss,splited);}
+            else if (splited[0].compare("route")==0) {std_route(ss,splited);}
+            else if (splited[0].compare("peers")==0) {std_peers(ss,splited);}
         } else { /* we got a packet */
             socklen_t addrlen;
             addrlen = sizeof(serv_addr);
@@ -148,7 +157,19 @@ int main(int argc, char *argv[]) {
             }
             /* get the message to struct */
             message* incoming = (message*)malloc(sizeof(message));
-            read(ret ,incoming, 512);
+            int bytes_readed = read(ret ,incoming, 512);
+            /* if 0 bytes were called from the socket. The socket has disconnected! */
+            if (bytes_readed==0) {
+                /* remove the socket from "sockets"! */
+                for(auto it = sockets.begin(); it != sockets.end(); it++) {
+	                if((it->second) == ret) {
+		                sockets.erase(it->first);
+		                break;}
+                }
+                /* remove the socket from monitoring! */
+                remove_fd_from_monitoring(ret);
+                continue;
+            }
             /* print message type */
             cout << "\033[1;36m"; /* print in color */
             cout << "Got " << message_type(incoming) << " message type!" << endl;
@@ -164,7 +185,7 @@ int main(int argc, char *argv[]) {
 //////////////////////////////// STD INPUT METHODS /////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 
-/* --------------------------------- SETID -------------------------------------- */
+/* ----------------------------- SETID (STDIN) ---------------------------------- */
 void std_setid(stringstream& ss,string splited[]) {
     getline(ss,splited[1],','); /* id */
     id = stoi(splited[1]);
@@ -173,7 +194,7 @@ void std_setid(stringstream& ss,string splited[]) {
     cout << "\033[0m"; /* end print in color */
 }
 
-/* -------------------------------- CONNECT ------------------------------------- */
+/* ---------------------------- CONNECT (STDIN) --------------------------------- */
 void std_connect(stringstream& ss,string splited[]) {
     getline(ss,splited[1],':'); /* ip */
     getline(ss,splited[2],':'); /* port */
@@ -210,11 +231,15 @@ void std_connect(stringstream& ss,string splited[]) {
     send(new_sock, outgoing_buffer, sizeof(outgoing_buffer), 0);
 }
 
-/* ---------------------------------- SEND -------------------------------------- */
+/* ------------------------------ SEND (STDIN) ---------------------------------- */
 void std_send(stringstream& ss,string splited[]) {
     getline(ss,splited[1],','); /* destination */
     getline(ss,splited[2],','); /* message length */
     getline(ss,splited[3],','); /* message itself */
+    if (sockets.size()==0) { /* No neighbors at all!. TODO: send to myself */
+        cout << "NACK" << endl;
+        return;
+    }
     if (sockets.find(stoi(splited[1]))!=sockets.end()) { /* connected directly. send the message! */
         message outgoing;
         outgoing.id = rand();
@@ -222,11 +247,14 @@ void std_send(stringstream& ss,string splited[]) {
         outgoing.dest = stoi(splited[1]);
         outgoing.trailMSG = 0;
         outgoing.funcID = 32; /* send function id is 32 */
-        memcpy(outgoing.payload, splited[3].c_str(), stoi(splited[2])); /* set the payload */
+        int msg_len = stoi(splited[2]);
+        memcpy(outgoing.payload, &msg_len, sizeof(int));
+        memcpy(outgoing.payload+sizeof(int), splited[3].c_str(), msg_len); /* set the payload */
         char outgoing_buffer[512];
         memcpy(outgoing_buffer, &outgoing, sizeof(outgoing));
         send(sockets.at(outgoing.dest), outgoing_buffer, sizeof(outgoing_buffer), 0);
     } else { /* not connected directly. we need to discover/relay&send. */
+        text[stoi(splited[1])] = splited[3];
         if(waze.find(stoi(splited[1]))==waze.end()){ /* no path! lets discover */
             int original_id = rand();
             node_to_reply[original_id] = {-1, -1}; /* source node! stop condition */
@@ -239,6 +267,43 @@ void std_send(stringstream& ss,string splited[]) {
 
         }
     }
+}
+
+/* ------------------------------ ROUTE (STDIN) --------------------------------- */
+void std_route(stringstream& ss,string splited[]) {
+    getline(ss,splited[1],','); /* destination */
+    if (stoi(splited[1])==id) { /* This is the current node! */
+        cout << id << endl;
+    }
+    if (sockets.find(stoi(splited[1]))!=sockets.end()) { /* This is a neighbor! */
+        cout << id << "->" << stoi(splited[1]) << endl;
+        return;
+    }
+    if (sockets.size()==0) { /* No neighbors at all! */
+        cout << "NACK" << endl;
+        return;
+    }
+    waze.erase(stoi(splited[1]));
+    int original_id = rand();
+    node_to_reply[original_id] = {-1, -1}; /* source node! stop condition */
+    for(auto nei : sockets) {
+        cout << "inserting " << nei.first << " to first_src_neis list.." << endl;
+        first_src_neis[stoi(splited[1])].insert(nei.first);
+    }
+    send_discover(stoi(splited[1]),original_id);
+}
+
+/* ------------------------------ PEERS (STDIN) --------------------------------- */
+void std_peers(stringstream& ss,string splited[]) {
+    cout << "ack" << endl;
+    if (sockets.size()==0) {return;} /* no neighbors at all! */
+    auto it = sockets.begin();
+    cout << it->first;
+    it++;
+    for(; it != sockets.end(); it++) {
+        cout << "," << it->first;
+    }
+    cout << endl;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -273,10 +338,13 @@ void gotmsg(message* msg, int ret){
 
 /* ----------------------------------- ACK -------------------------------------- */
 void ack(message* msg, int ret){//,int messagenum){
+    int ack_type;
+    memcpy(&ack_type, msg->payload+sizeof(int), sizeof(int)); /* save ack_type from msg payload */
     /* if the socket is unknown then the ack is for a connect message!
        therfore add the socket to connected sockets list! */
-    if (sockets.count(msg->src)==0) {
-        sockets.insert({msg->src,ret});
+    if (ack_type==4) {
+        sockets[msg->src] = ret;
+        //sockets.insert({msg->src,ret});
     }
 }
 
@@ -296,14 +364,18 @@ void nack(message* msg, int ret) {
                 send_discover(destination,discover_id);
                 return;
             } else { /* returned to source node. finish! */
-                if (waze.count(discover_id)!=0) { /* if found path print it! */
-                    int len = waze[destination].size();
-                    cout << "path: " << id << "->";
-                    for (int i = 0; i < len-1; i++) {
-                        cout << waze[destination][i] << "->";
+                if (waze.count(discover_id)!=0) { /* found path! */
+                    /* there is text to send so discover called by relay! call relay! */
+                    if (!text[destination].empty()) {
+                        send_relay(destination,discover_id);
+                    } else { /* discover called by route! print the path! */
+                        int len = waze[destination].size();
+                        cout << "path: " << id << "->";
+                        for (int i = 0; i < len-1; i++) {
+                            cout << waze[destination][i] << "->";
+                        }
+                        cout << waze[destination][len-1] << endl;
                     }
-                    cout << waze[destination][len-1] << endl;
-                    send_relay(destination,discover_id);
                 } else {
                     cout << "sorry, didnt find path! :(" << endl;
                 }
@@ -332,18 +404,26 @@ void cnct(message* msg, int ret){
     message rply; /* ack */
     rply.id=random();
     rply.src=id;
+    int connect_id = 4;
     memcpy(rply.payload, (char*)&msg->id,sizeof(int));
+    memcpy(rply.payload+sizeof(int), &connect_id,sizeof(int));
     rply.trailMSG=0;
     rply.funcID=1;
-    //sockets[msg->src] = ret;
-    sockets.insert({msg->src,ret});
+    sockets[msg->src] = ret;
+    //sockets.insert({msg->src,ret});
     add_fd_to_monitoring(ret);
     write(ret,&rply,sizeof(rply));
 }
 
 /* ---------------------------------- SEND -------------------------------------- */
 void Send(message* msg, int ret) {
-    cout << msg->payload << endl;
+    int length;
+    memcpy(&length, &msg->payload, sizeof(int));
+    string newString;
+    newString.resize(length);
+    memcpy((char*)newString.data(), msg->payload+sizeof(int), length);
+    //memcpy(&text, msg->payload, length);
+    cout << "getting len: " << length << ". msg: " << newString << endl;
     message rply; /* ack */
     rply.id=random();
     rply.src=id;
@@ -361,6 +441,8 @@ void discover(message* msg, int ret) {
     int discover_id;
     memcpy(&destination, msg->payload, sizeof(int)); /* save destination from msg payload */
     memcpy(&discover_id, msg->payload+sizeof(int), sizeof(int)); /* save discover_id from msg payload */
+    /* if we got discover message so the current path could be wrong! erase the path if exists */
+    waze.erase(discover_id);
     /* circle! cannot continue discovering! */
     if ((node_to_reply[discover_id].first!=-1&&my_stack[discover_id].size()>0)
             ||(node_to_reply[discover_id].first==-1&&first_src_neis[destination].size()>0)) {
@@ -425,13 +507,17 @@ void route(message* msg, int ret) {
             send_discover(destination,discover_id);
             return;
         } else { /* we visited all the nodes & returned to source node. finish! */
-            int len = waze[destination].size();
-            cout << "path: " << id << "->";
-            for (int i = 0; i < len-1; i++) {
-                cout << waze[destination][i] << "->";
+            /* if there is text to send so discover called by relay! call relay! */
+            if (!text[destination].empty()) {
+                send_relay(destination,discover_id);
+            } else { /* discover called by route! print the path! */
+                int len = waze[destination].size();
+                cout << "path: " << id << "->";
+                for (int i = 0; i < len-1; i++) {
+                    cout << waze[destination][i] << "->";
+                }
+                cout << waze[destination][len-1] << endl;
             }
-            cout << waze[destination][len-1] << endl;
-            send_relay(destination,discover_id);
             //node_to_reply.erase(discover_id);
             return;
         }
@@ -450,15 +536,16 @@ void route(message* msg, int ret) {
 
 /* --------------------------------- RELAY -------------------------------------- */
 void relay(message* msg, int ret){
-    int trail,dest,src;
+    int trail,dest,src, discover_id;
     memcpy(&trail, &msg->trailMSG, sizeof(int));
-    memcpy(&dest,&msg->payload,sizeof(int));
-    memcpy(&src,&msg->src,sizeof(int));
-//    char pipe[512*trail];
-//    read(sockets[src],&pipe,sizeof(pipe));
-   // void * pipe;
-    //read(sockets[src],&pipe,512*trail);
-    write(sockets[dest],&sockets[src],512*trail);
+    memcpy(&dest, &msg->payload,sizeof(int));
+    memcpy(&discover_id, &msg->payload+2*sizeof(int),sizeof(int));
+    memcpy(&src, &msg->src,sizeof(int));
+    node_to_reply[discover_id] = {msg->src,msg->id};
+    cout << "trail: " << trail << ". dest: " << dest << ". src: " << src << endl;
+    char pipe[512*trail];
+    read(ret,pipe,sizeof(pipe));
+    write(sockets[dest],&pipe,512*trail);
 };
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -613,17 +700,19 @@ void send_relay(int destination,int original_id) {
     message relays;
     relays.funcID=64;
     int msg_id=random();
+    node_to_reply[msg_id] = {-1, -1};
     /* starting from 1 to length-1.
        from 1 because the first message is read by the first node to which it is sent
        to length-1 because the last message is "send" message and not "relay" message */
-    for (int i = 1; i < length-1; ++i) {
+    for (int i = 1; i <= length-1; ++i) {
         relays.id=msg_id+i;
         relays.src=id;
         relays.dest=waze[destination][i];
         relays.trailMSG=length-i;
         int len = length-i;
-        memcpy(relays.payload,&waze[destination][i+1],sizeof(int));
+        memcpy(relays.payload,&waze[destination][i],sizeof(int));
         memcpy(relays.payload+sizeof(int),&len,sizeof(int));
+        memcpy(relays.payload+2*sizeof(int),&msg_id,sizeof(int));
         memcpy(pipe+((i-1)*sizeof(relays)),&relays,sizeof(relays));
     }
     message msg;
@@ -632,10 +721,13 @@ void send_relay(int destination,int original_id) {
     msg.trailMSG=0;
     msg.funcID=32;
     int txt_length;
-    txt_length=strlen(text[original_id].c_str());
-    memcpy(msg.payload,&length,sizeof(int));
-    memcpy(msg.payload+sizeof(int),text[original_id].c_str(),length);
+    txt_length=strlen(text[destination].c_str());
+    string txt_to_send = text[destination];
+    memcpy(msg.payload,&txt_length,sizeof(int));
+    cout << "sending len: " << txt_length << ". msg: " << txt_to_send << endl;
+    memcpy(msg.payload+sizeof(int),txt_to_send.c_str(),txt_length);
     memcpy(pipe+(length-1)*sizeof(message),&msg,sizeof(msg));
     int dest=waze[destination][0];
+    text[destination].erase(); /* we wrote the text to the message! remove the text from data structure */
     write(sockets[dest],&pipe,sizeof(pipe));
 }

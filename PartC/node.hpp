@@ -52,6 +52,8 @@ string message_type(message* msg);
 void std_setid(stringstream& ss,string splited[]);
 void std_send(stringstream& ss,string splited[]);
 void std_connect(stringstream& ss,string splited[]);
+void std_route(stringstream& ss,string splited[]);
+void std_peers(stringstream& ss,string splited[]);
 
 void send_nack(message* msg);
 void send_ack(message* msg);

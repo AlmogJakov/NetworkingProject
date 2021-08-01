@@ -28,6 +28,32 @@ static int add_fd_to_monitoring_internal(const unsigned int fd) {
   return 0;
 }
 
+static int remove_fd_from_monitoring_internal(const unsigned int fd) {
+  int new_alloced_fds_num = alloced_fds_num-1;
+  int arr[new_alloced_fds_num];
+  int i = 0;
+  /* backup all the sockets except from fd */
+  while (i<new_alloced_fds_num) {
+    if (alloced_fds[i]!=fd) {
+      arr[i] = alloced_fds[i];
+      i++;
+    }
+  }
+  /* init values */
+  initialized = FALSE;
+  alloced_fds_num = 0;
+  max_fd = 0;
+  /* re-add relevant sockets */
+  for (int j = 0; j < new_alloced_fds_num; j++) {
+    add_fd_to_monitoring(arr[j]);
+  }
+  return 0;
+}
+
+int remove_fd_from_monitoring(const unsigned int fd) {
+  return remove_fd_from_monitoring_internal(fd);
+}
+
 int init() {
   FD_ZERO(&rfds_copy);
   if (add_fd_to_monitoring_internal(0) < 0)
@@ -51,8 +77,6 @@ int wait_for_input() {
   if (retval > 0) {
     for (i=0; i<alloced_fds_num; ++i) {
       if (FD_ISSET(alloced_fds[i], &rfds)) {
-        //std:: cout << "hey!" << std::endl;
-        //memset(&rfds, '\0', sizeof(rfds));
         return alloced_fds[i];
       }
     }
