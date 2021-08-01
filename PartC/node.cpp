@@ -264,8 +264,10 @@ void std_send(stringstream& ss,string splited[]) {
                 first_src_neis[stoi(splited[1])].insert(nei.first);
             }
             send_discover(stoi(splited[1]),original_id);}
-        else {
-
+        else { /* if there is already a path */
+            int original_id = rand();
+            node_to_reply[original_id] = {-1, -1}; /* source node! stop condition */
+            send_relay(stoi(splited[1]),original_id);
         }
     }
 }
@@ -578,7 +580,7 @@ void send_route(message *msg) {
     rply.src = id;
     rply.funcID = 16;
     rply.trailMSG = 0;
-    if (msg->funcID == 8) {
+    if (msg->funcID == 8) { /* need to respond to discover message */
         int path_length = 2;
         memcpy(&destination, msg->payload, sizeof(int));
         memcpy(&discover_id, msg->payload + sizeof(int), sizeof(int));
@@ -590,11 +592,11 @@ void send_route(message *msg) {
         cout << "1) got " << msg->funcID << " msg. sending " << rply.funcID << " msg to " << node_to_reply[discover_id].first << endl;
         write(sockets[rply.dest], &rply, sizeof(rply));
         return;
-    } else if (msg->funcID == 2) {
+    } else if (msg->funcID == 2) { /* need to respond to nack message */
         memcpy(&discover_id, msg->payload + 3 * sizeof(int), sizeof(int));//get discover_id
         memcpy(&destination, msg->payload + 4 * sizeof(int), sizeof(int));//get destination
         cout << "2) got " << msg->funcID << " msg. sending " << rply.funcID << " msg to " << node_to_reply[discover_id].first << endl;
-    } else if (msg->funcID == 16) {
+    } else if (msg->funcID == 16) { /* need to respond to route message */
         memcpy(&discover_id, msg->payload, sizeof(int));
         memcpy(&length, msg->payload + sizeof(int), sizeof(int));
         memcpy(&destination, msg->payload + (2 + length - 1) * sizeof(int),
@@ -625,11 +627,11 @@ void send_nack(message* msg) {
     rply.dest = msg->src;
     rply.trailMSG=0;
     rply.funcID=2;
-    if (msg->funcID==2) { /* need to return nack for nack message */
+    if (msg->funcID==2) { /* need to respond to nack message */
         int nack_type;
         memcpy(&nack_type, msg->payload+sizeof(int), sizeof(int));
         /* read and write data to payload in accordance to the nack type */
-        if (nack_type==8) {
+        if (nack_type==8) { /* the nack message we received responds to discover message */
             memcpy(&discover_id, msg->payload+2*sizeof(int), sizeof(int));
             memcpy(&destination, msg->payload+3*sizeof(int), sizeof(int));
             int prev_node = node_to_reply[discover_id].first;
@@ -640,7 +642,7 @@ void send_nack(message* msg) {
             memcpy(rply.payload+2*sizeof(int), &discover_id,sizeof(int));
             memcpy(rply.payload+3*sizeof(int), &destination,sizeof(int));
         }
-    } else if (msg->funcID==8) { /* need to return nack for discover message */
+    } else if (msg->funcID==8) { /* need to respond to discover message */
         int nack_type = 8;
         memcpy(&destination, msg->payload, sizeof(int));
         memcpy(&discover_id, msg->payload+sizeof(int), sizeof(int));
@@ -650,7 +652,7 @@ void send_nack(message* msg) {
         memcpy(rply.payload+1*sizeof(int), &nack_type,sizeof(int));
         memcpy(rply.payload+2*sizeof(int), &discover_id,sizeof(int));
         memcpy(rply.payload+3*sizeof(int), &destination,sizeof(int));
-    } else { /* TODO: else if nack_type==64 (relay) */
+    } else if (msg->funcID==64) { /* TODO: else if nack_type==64 (relay) */
         memcpy(rply.payload, &msg->id,sizeof(int));
     }
     //node_to_reply.erase(discover_id);
