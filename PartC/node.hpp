@@ -55,6 +55,10 @@ void std_connect(stringstream& ss,string splited[]);
 void std_route(stringstream& ss,string splited[]);
 void std_peers(stringstream& ss,string splited[]);
 
+void std_del();
+void send_Del(int general_request_id);
+void del(message *msg);
+
 void send_nack(message* msg);
 void send_ack(message* msg);
 void send_route(message* msg);
