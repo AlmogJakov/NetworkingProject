@@ -27,7 +27,7 @@ In this implementation we develop a node in a network where communication betwee
 <h3> The following actions can be performed: </h3>    
 
 ⚪  **setid,id** - setting the id of the current node.  
-⚪  **connect,ip:port** - connecting the current node that meets the inputed IP and port.  
+⚪  **connect,ip:port** - connecting the current node to the node that meets the inputed IP and port.  
 ⚪  **send,dest-id,data-length,data** - sending data of the given length to the given destination node.  
 ⚪  **route,node-id** - printing the path to the given node (if exists).  
 ⚪  **peers** - printing the list of the connected (directly) nodes.  	
