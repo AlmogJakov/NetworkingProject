@@ -82,6 +82,13 @@
 |                                                | TEXT LEN | TEXT . . . | NODE TO REPLY | GENERAL REQUEST ID |
 |_____________________________________________________________________________________________________________|
 
+~   ~   ~   ~   ~   ~   ~   ~   DELETE HEADER   ~   ~   ~   ~   ~   ~   ~   ~
+ _______________________________________________________________________________________
+| MSG ID | SRC ID | DST ID | TRAIL MSG | FUNC ID |               PAYLOAD                |
+|---------------------------------------------------------------------------------------|
+|                                                | GENERAL REQUEST ID |                 |
+|_______________________________________________________________________________________|
+
 */
 
 /* my id */
@@ -176,14 +183,18 @@ int main(int argc, char *argv[]) {
             /* if 0 bytes were called from the socket. The socket has disconnected! */
             if (bytes_readed==0) {
                 /* remove the socket from "sockets"! */
+                int removed_id;
                 for(auto it = sockets.begin(); it != sockets.end(); it++) {
 	                if((it->second) == ret) {
+                        removed_id = it->first; /* save the id of the removed node */
 		                sockets.erase(it->first);
 		                break;}
                 }
                 cout << "socket " << ret << " removed" << endl;
                 /* remove the socket from monitoring! */
                 remove_fd_from_monitoring(ret);
+                node_to_reply[removed_id] = {-1, -1};
+                std_del(removed_id);
                 continue;
                 // TODO: call std_del
             }
@@ -296,16 +307,26 @@ void std_route(stringstream& ss,string splited[]) {
     getline(ss,splited[1],','); /* destination */
     if (stoi(splited[1])==id) { /* This is the current node! */
         cout << id << endl;
+        return;
     }
     if (sockets.find(stoi(splited[1]))!=sockets.end()) { /* This is a neighbor! */
         cout << id << "->" << stoi(splited[1]) << endl;
+        return;
+    }
+    if (waze.find(stoi(splited[1]))!=waze.end()) { /* we have the path! print it! */
+        int len = waze[stoi(splited[1])].size();
+        cout << "path: " << id << "->";
+        for (int i = 0; i < len-1; i++) {
+            cout << waze[stoi(splited[1])][i] << "->";
+        }
+        cout << waze[stoi(splited[1])][len-1] << endl;
         return;
     }
     if (sockets.size()==0) { /* No neighbors at all! */
         cout << "NACK" << endl;
         return;
     }
-    waze.erase(stoi(splited[1]));
+    //waze.erase(stoi(splited[1]));
     int original_id = rand();
     node_to_reply[original_id] = {-1, -1}; /* source node! stop condition */
     for(auto nei : sockets) {
@@ -329,8 +350,17 @@ void std_peers(stringstream& ss,string splited[]) {
 }
 
 /* --------------------------------- DELETE ------------------------------------ */
-void std_del() {
-    int original_id = random();
+void std_del(int original_id) {
+    if (!waze.empty()) {
+        waze.clear();
+        cout << "waze cleared!" << endl;
+    } else {
+        cout << "waze already cleared!" << endl;
+    }
+    if (sockets.empty()) { /* no neighbors to send delete message */
+        return;
+    }
+    //int original_id = random();
     node_to_reply[original_id] = {-1, -1};
     for (auto nei : sockets) {
         cout << "inserting " << nei.first << " to first_src_neis list.." << endl;
@@ -392,6 +422,8 @@ void ack(message *msg, int ret) {//,int messagenum){
     if (ack_type == 4) { /* respond to a connect message */
         sockets[msg->src] = ret;
         cout << "Ack" << endl;
+        int original_id = random();
+        std_del(original_id);
         //sockets.insert({msg->src,ret});
     }
     if (ack_type == 32) {
@@ -404,7 +436,8 @@ void ack(message *msg, int ret) {//,int messagenum){
         }
     }
     if (ack_type == 128) {
-        waze.clear();
+        //waze.clear();
+        //cout << "waze cleared!" << endl;
         int general_request_id;
         memcpy(&general_request_id, msg->payload + 2 * sizeof(int), sizeof(int));
         nodes_to_request[general_request_id].erase(msg->src); /* remove the current node from neighbors */
@@ -412,10 +445,11 @@ void ack(message *msg, int ret) {//,int messagenum){
             send_Del(general_request_id);
             return;
         } else { /* finished all the neighbors! returning */
-            if (node_to_reply[general_request_id].first != -1) {
-                send_ack(msg);
+            if (node_to_reply[general_request_id].first == -1) {
+                node_to_reply.erase(general_request_id);
+                return;
             }
-            node_to_reply.erase(general_request_id);
+            send_ack(msg);
         }
     }
 }
@@ -507,6 +541,7 @@ void cnct(message* msg, int ret){
     memcpy(rply.payload+sizeof(int), &connect_id,sizeof(int));
     rply.trailMSG=0;
     rply.funcID=1;
+    rply.dest=msg->src;
     sockets[msg->src] = ret;
     //sockets.insert({msg->src,ret});
     add_fd_to_monitoring(ret);
@@ -575,7 +610,7 @@ void discover(message* msg, int ret) {
     memcpy(&destination, msg->payload, sizeof(int)); /* save destination from msg payload */
     memcpy(&general_request_id, msg->payload+sizeof(int), sizeof(int)); /* save general_request_id from msg payload */
     /* if we got discover message so the current path could be wrong! erase the path if exists */
-    waze.erase(general_request_id);
+    //waze.erase(general_request_id);
     /* circle! cannot continue discovering! */
     if ((node_to_reply[general_request_id].first!=-1&&nodes_to_request[general_request_id].size()>0)
             ||(node_to_reply[general_request_id].first==-1&&first_src_neis[destination].size()>0)) {
@@ -704,20 +739,30 @@ void relay(message *msg, int ret) {
 
 /* --------------------------------- DELETE -------------------------------------- */
 void del(message *msg) {
+    if (!waze.empty()) {
+        waze.clear();
+        cout << "waze cleared!" << endl;
+    } else {
+        cout << "waze already cleared!" << endl;
+    }
     int general_request_id;
-    memcpy(&general_request_id, msg->payload + sizeof(int),
-           sizeof(int)); /* save general_request_id from msg payload */
+    memcpy(&general_request_id, msg->payload,sizeof(int)); /* save general_request_id from msg payload */
     if (nodes_to_request[general_request_id].size() > 0) {
         cout << msg->src << " send to me (my id:" << id << ") and closed circle! return nack" << endl;
         send_nack(msg);
         return;
     }
     /* update node_to_reply (overwrite if exists) */
+    cout << "node to reply for delete: " << msg->src << endl;
     node_to_reply[general_request_id] = {msg->src, msg->id};
     if (sockets.size() == 1) { /* leaf! cannot continue discovering! */
         cout << "i am a leaf! return nack!" << endl;
         send_ack(msg);//TODO: change send_ack to include 128
-    } else { /* we can continue discovering */
+        node_to_reply.erase(general_request_id);
+        //waze.clear();
+        //cout << "waze cleared!" << endl;
+    }
+    else { /* we can continue discovering */
         cout << "continue deleting" << endl;
         /* add all neighbors to nodes_to_request & keep discovering forward (to random neighbor) */
         for (auto nei : sockets) {
@@ -747,6 +792,7 @@ string message_type(message* msg) {
     else if (func_id==16) return "Route";
     else if (func_id==32) return "Send";
     else if (func_id==64) return "Relay";
+    else if (func_id==128) return "Delete";
     return "(Can not identify)";
 }
 
@@ -831,6 +877,7 @@ void send_nack(message* msg) {
             //memcpy(&destination, msg->payload + 3 * sizeof(int), sizeof(int));
             int prev_node = node_to_reply[general_request_id].first;
             rply.dest = prev_node;
+            cout << "nack for nack. sending nack to " << rply.dest << endl;
             /* write to the new message */
             memcpy(rply.payload, &prev_node, sizeof(int));
             memcpy(rply.payload + 1 * sizeof(int), &nack_type, sizeof(int));
@@ -856,11 +903,13 @@ void send_nack(message* msg) {
         rply.dest = node_to_reply[general_request_id].first;
     } else if (msg->funcID == 128) {
         memcpy(&general_request_id, msg->payload, sizeof(int));
-        int prev_node = node_to_reply[general_request_id].first;
-        rply.dest = prev_node;
+        //int prev_node = node_to_reply[general_request_id].first;
+        //rply.dest = prev_node;
+        rply.dest = msg->src;
+        cout << "nack for delete. sending nack to " << rply.dest << endl;
         /* write to the new message */
-        memcpy(rply.payload, &prev_node, sizeof(int));
-        memcpy(rply.payload + 1 * sizeof(int), (void *) 128, sizeof(int));
+        memcpy(rply.payload, &msg->id, sizeof(int));
+        memcpy(rply.payload + 1 * sizeof(int), &msg->funcID, sizeof(int));
         memcpy(rply.payload + 2 * sizeof(int), &general_request_id, sizeof(int));
     }
     //node_to_reply.erase(general_request_id);
@@ -905,6 +954,7 @@ void send_ack(message *msg) {
         memcpy(reply.payload + 2 * sizeof(int), &gen_r_id, sizeof(int));
         //memcpy(&reply->payload,gen_r_id,sizeof(int))
         reply.dest = node_to_reply[gen_r_id].first;
+        cout << "ack for delete. sending ack to " << reply.dest << endl;
     }
         /*
          * those two are basically the same
@@ -920,16 +970,17 @@ void send_ack(message *msg) {
             reply.dest = node_to_reply[gen_r_id].first;
             cout << "returning ack for ack. to " << reply.dest << endl;
         } else if (message_type == 128) {
-            memcpy(&gen_r_id, msg->payload, sizeof(int));
+            memcpy(&gen_r_id, msg->payload + 2 * sizeof(int), sizeof(int));
             memcpy(reply.payload, &node_to_reply[gen_r_id].second, sizeof(int));
             memcpy(reply.payload + sizeof(int), &message_type, sizeof(int));
             memcpy(reply.payload + 2 * sizeof(int), &gen_r_id, sizeof(int));
-            //if (nodes_to_request[gen_r_id].empty()) {
+            if (nodes_to_request[gen_r_id].empty()) {
                 reply.dest = node_to_reply[gen_r_id].first;
                 node_to_reply.erase(gen_r_id);
-           // } else {
-            //    reply.dest = *nodes_to_request[gen_r_id].begin();
-            //}
+            } else {
+                reply.dest = *nodes_to_request[gen_r_id].begin();
+            }
+            cout << "ack for ack. sending ack to " << reply.dest << endl;
         }
     }
     write(sockets[reply.dest], &reply, sizeof(reply));
