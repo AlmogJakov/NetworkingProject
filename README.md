@@ -40,7 +40,7 @@ In this implementation we develop a node in a network where communication betwee
 Represents a network computer.
 Contains a number of data structures in order to perform mutual communication operations between computers:
 
-- **int id** - A unique id that represents the computer on the network.  
+- **int id** - a unique id that represents the computer on the network.  
 - **unordered_map <int, unsigned int> sockets** - map of the connected nodes (key - socket id. value - socket fd).  
 - **unordered_map <int, string> text** - map of the data (text) that the current node should send to specific node (key - dest node id. value - text).  
 - **unordered_map <int, vector <int>> waze** - map of the pathways to certain nodes (key - dest node id. value - the path).  
