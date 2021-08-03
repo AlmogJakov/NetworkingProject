@@ -29,7 +29,7 @@ In this implementation we develop a node in a network where communication betwee
 ⚪  **setid,id** - setting the id of the current node.  
 ⚪  **connect,ip:port** - connecting the current node to the node that meets the inputed IP and Port.  
 ⚪  **send,dest-node-id,data-length,data** - sending data of the given length to the given destination node.  
-⚪  **route,node-id** - printing the route to the given node if the node exists (if the route is unknown discover it before printing).  
+⚪  **route,node-id** - printing the route to the given node if the node exists (if the route is unknown discover before printing).  
 ⚪  **peers** - printing the list of the connected (directly) nodes.  	
 
 -----
