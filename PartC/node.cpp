@@ -112,34 +112,25 @@ unordered_map<int,set<int>> first_src_neis;
    value: pair (first - the node id to reply. second - last message id) */
 unordered_map<int,pair<int, int>> node_to_reply;
 
+// static string GetLocalIPAddress() {
+//     var host = Dns.GetHostEntry(Dns.GetHostName());
+//     foreach (var ip in host.AddressList){
+//         if (ip.AddressFamily == AddressFamily.InterNetwork) {
+//             return ip.ToString();
+//         }
+//     }
+//     throw new Exception("No network adapters with an IPv4 address in the system!");
+// }
+
 //message * main_msg;
 int main(int argc, char *argv[]) {
     int innerfd = 0, outerfd=0;
     struct sockaddr_in serv_addr; 
     int ret, i;
-    int r_port;
-    printf("Please choose a port: ");
-    scanf("%d", &r_port);
-    char buff[1025];
-    // time_t ticks;
-    innerfd = socket(AF_INET, SOCK_STREAM, 0);
-
-    int enable = 1;
-    if (setsockopt(innerfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
-        printf("\nInvalid address/ Address not supported \n");
-        return 1;
-    }
-
-    memset(&serv_addr, '0', sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    serv_addr.sin_port = htons(r_port);
-    bind(innerfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
-    printf("adding fd(%d) to monitoring\n", innerfd);
-    add_fd_to_monitoring(innerfd);
-    listen(innerfd, 10);
+    int r_port = 12345; /* default Port */
+    if (argc>1) {r_port = stoi(argv[1]);} /* set user input Port if received */
     printf("---------------------------------\n");
-    cout << "USE THE COMMAND: connect,192.168.190.129:12350" << endl;
+    cout << "USE THE COMMAND: connect,192.168.190.129:X" << endl;
     /* Print my ip */
     struct sockaddr_in* pV4Addr = (struct sockaddr_in*)&inet_addr;
     struct in_addr ipAddr = pV4Addr->sin_addr;
@@ -147,8 +138,30 @@ int main(int argc, char *argv[]) {
     inet_ntop( AF_INET, &ipAddr, str, INET_ADDRSTRLEN );
     printf("MY IP: %s\n", str);
     /* Print my port */
-    printf("MY PORTS: %d\n", r_port);
+    printf("MY PORT: %d\n", r_port);
     printf("---------------------------------\n");
+    if (argc>2) { /* set user input ID if received */
+        id = stoi(argv[2]);
+        cout << "\033[1;36m"; /* print in color */
+        cout << "MY ID: " << id << endl;
+        cout << "\033[0m"; /* end print in color */
+    } 
+    char buff[1025];
+    // time_t ticks;
+    innerfd = socket(AF_INET, SOCK_STREAM, 0);
+    int enable = 1;
+    if (setsockopt(innerfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
+        printf("\nInvalid address/ Address not supported \n");
+        return 1;
+    }
+    memset(&serv_addr, '0', sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serv_addr.sin_port = htons(r_port);
+    bind(innerfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
+    printf("adding fd(%d) to monitoring\n", innerfd); /* TODO: remove line */
+    add_fd_to_monitoring(innerfd);
+    listen(innerfd, 10);
 
     while(true){
         memset(&buff, '\0', sizeof(buff));
@@ -198,9 +211,9 @@ int main(int argc, char *argv[]) {
                 cout << "socket " << ret << " removed" << endl;
                 /* remove the socket from monitoring! */
                 remove_fd_from_monitoring(ret);
-                std_del(removed_id);
+                std_refresh(removed_id);
                 continue;
-                // TODO: call std_del
+                // TODO: call std_refresh
             }
             /* print message type */
             cout << "\033[1;36m"; /* print in color */
@@ -352,7 +365,7 @@ void std_peers(stringstream& ss,string splited[]) {
 }
 
 /* --------------------------------- DELETE ------------------------------------ */
-void std_del(int original_id) {
+void std_refresh(int original_id) {
     if (!waze.empty()) {
         waze.clear();
         cout << "waze cleared!" << endl;
@@ -366,7 +379,7 @@ void std_del(int original_id) {
         cout << "inserting " << nei.first << " to first_src_neis list.." << endl;
         nodes_to_request[original_id].insert(nei.first);
     }
-    send_Del(original_id);
+    send_refresh(original_id);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -376,34 +389,34 @@ void std_del(int original_id) {
 void gotmsg(message* msg, int ret){
     switch(msg->funcID){
         case 1:{ /* ACK */
-            ack(msg,ret);
+            input_ack(msg,ret);
             break;}
         case 2:{ /* NACK */
-            nack(msg, ret);
+            input_nack(msg, ret);
             break;}
        case 4:{ /* CONNECT */
-           cnct(msg, ret);
-           break;}
+            input_connect(msg, ret);
+            break;}
         case 8:{ /* DISCOVER */
-            discover(msg, ret);
+            input_discover(msg, ret);
             break;}
         case 16:{ /* ROUTE */
-            route(msg, ret);
+            input_route(msg, ret);
             break;}
         case 32:{ /* SEND */
-            Send(msg, ret);
+            input_send(msg, ret);
             break;}
         case 64: { /* RELAY */
-            relay(msg, ret);
+            input_relay(msg, ret);
             break;}
         case 128: {
-            del(msg);
+            input_refresh(msg);
             break;}
     }
 }
 
-/* ----------------------------------- ACK -------------------------------------- */
-void ack(message *msg, int ret) {//,int messagenum){
+/* -------------------------------- ACK INPUT ----------------------------------- */
+void input_ack(message *msg, int ret) {//,int messagenum){
     int ack_type;
     memcpy(&ack_type, msg->payload + sizeof(int), sizeof(int)); /* save ack_type from msg payload */
     /* if the socket is unknown then the ack is for a connect message!
@@ -415,7 +428,7 @@ void ack(message *msg, int ret) {//,int messagenum){
         node_to_reply[general_req_id] = {-1, -1};
         sockets[msg->src] = ret;
         cout << "Ack" << endl;
-        std_del(general_req_id);
+        std_refresh(general_req_id);
     }
     if (ack_type == 32) { /* respond to ack of send message */
         int general_request_id;
@@ -431,7 +444,7 @@ void ack(message *msg, int ret) {//,int messagenum){
         memcpy(&general_request_id, msg->payload + 2 * sizeof(int), sizeof(int));
         nodes_to_request[general_request_id].erase(msg->src); /* remove the current node from neighbors */
         if (!nodes_to_request[general_request_id].empty()) { /* there are more neighbors. keep discovering! */
-            send_Del(general_request_id);
+            send_refresh(general_request_id);
             return;
         } else { /* finished all the neighbors! returning */
             if (node_to_reply[general_request_id].first == -1) {
@@ -443,8 +456,8 @@ void ack(message *msg, int ret) {//,int messagenum){
     }
 }
 
-/* ---------------------------------- NACK -------------------------------------- */
-void nack(message* msg, int ret) {
+/* ------------------------------- NACK INPUT ----------------------------------- */
+void input_nack(message* msg, int ret) {
     /* nack type is the function id that the nack returns for */
     int nack_type;
     memcpy(&nack_type, msg->payload+sizeof(int), sizeof(int)); /* save nack_type from msg payload */
@@ -508,7 +521,7 @@ void nack(message* msg, int ret) {
                sizeof(int)); /* save general_request_id from msg payload */
         nodes_to_request[general_request_id].erase(msg->src); /* remove the current node from neighbors */
         if (nodes_to_request[general_request_id].size() > 0) {/* there are more neighbors. keep discovering! */
-            send_Del(general_request_id);
+            send_refresh(general_request_id);
             return;
         } else { /* done searching! */
             if (node_to_reply[general_request_id].first == -1) {
@@ -520,8 +533,8 @@ void nack(message* msg, int ret) {
     }
 }
 
-/* --------------------------------- CONNECT ------------------------------------ */
-void cnct(message* msg, int ret){
+/* ------------------------------ CONNECT INPUT --------------------------------- */
+void input_connect(message* msg, int ret){
     message rply; /* ack */
     rply.id=random();
     rply.src=id;
@@ -536,8 +549,8 @@ void cnct(message* msg, int ret){
     write(ret,&rply,sizeof(rply));
 }
 
-/* ---------------------------------- SEND -------------------------------------- */
-void Send(message *msg, int ret) {
+/* ------------------------------- SEND INPUT ----------------------------------- */
+void input_send(message *msg, int ret) {
     // TODO: In all parts of the send message the node to reply value is the node before the last
     int gen_r_id;
     int node_to_rply;
@@ -564,8 +577,8 @@ void Send(message *msg, int ret) {
     send_ack(msg);
 }
 
-/* -------------------------------- DISCOVER ------------------------------------ */
-void discover(message* msg, int ret) {
+/* ----------------------------- DISCOVER INPUT --------------------------------- */
+void input_discover(message* msg, int ret) {
     /* Note! If discover method was activated so dest is not an neighbor! */
     int destination;
     int general_request_id;
@@ -605,8 +618,8 @@ void discover(message* msg, int ret) {
     }
 }
 
-/* --------------------------------- ROUTE -------------------------------------- */
-void route(message* msg, int ret) {
+/* ------------------------------ ROUTE INPUT ----------------------------------- */
+void input_route(message* msg, int ret) {
     int length ,general_request_id;
     memcpy(&general_request_id, msg->payload, sizeof(int));
     memcpy(&length, msg->payload+(1)*sizeof(int), sizeof(int)); /* save path length from msg payload */
@@ -666,8 +679,8 @@ void route(message* msg, int ret) {
     }
 }
 
-/* --------------------------------- RELAY -------------------------------------- */
-void relay(message *msg, int ret) {
+/* ------------------------------ RELAY INPUT ----------------------------------- */
+void input_relay(message *msg, int ret) {
     int trail, dest, src, general_request_id;
     memcpy(&trail, &msg->trailMSG, sizeof(int));
     memcpy(&dest, &msg->payload, sizeof(int));
@@ -684,8 +697,8 @@ void relay(message *msg, int ret) {
     write(sockets[dest], &pipe, 512 * trail);
 }
 
-/* --------------------------------- DELETE -------------------------------------- */
-void del(message *msg) {
+/* ------------------------------ DELETE INPUT ----------------------------------- */
+void input_refresh(message *msg) {
     if (!waze.empty()) {
         waze.clear();
         cout << "waze cleared!" << endl;
@@ -717,7 +730,7 @@ void del(message *msg) {
                 cout << "adding " << nei.first << " to my nodes_to_request" << endl;
             }
         }
-        send_Del(general_request_id);
+        send_refresh(general_request_id);
     }
 }
 
@@ -1014,7 +1027,7 @@ void send_relay(int destination, int original_id) {
 }
 
 /* ------------------------------ SEND DELETE ----------------------------------- */
-void send_Del(int general_request_id) {
+void send_refresh(int general_request_id) {
     message del_msg;
     del_msg.id = random();
     del_msg.src = id;
