@@ -5,21 +5,16 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-#include <string.h>
 #include <sys/types.h>
-#include <time.h>
 #include <netdb.h> /* addrinfo */
 
+#include <iostream>
 #include <bits/stdc++.h> /* INT_MIN */
 #include <numeric> /* accumulate */
-#include <set>
-#include <list>
-#include <map>
-#include <unordered_map>
-#include <iostream>
-#include <string>
-#include <vector>
-#include <sstream>
+#include <set> /* e.g nodes_to_request set */
+#include <unordered_map> /* e.g sockets unordered_map */
+#include <vector> /* e.g waze vector */
+#include <sstream> /* stdin input to sstream */
 #include <cmath> /* floor */
 
 #include "select.hpp"
@@ -180,7 +175,7 @@ int main(int argc, char *argv[]) {
            stdout is defined to be file descriptor 1,
            and stderr is defined to be file descriptor 2. */
         if (ret < 2) { // std input
-            read(ret, buff, 1025);
+            read(ret, buff, 2050); // 1025
             if (buff[strlen(buff)-1]=='\n') buff[strlen(buff)-1] = '\0';
             stringstream ss;
             ss << buff;
@@ -573,14 +568,17 @@ void input_send(message *msg, int ret) {
     node_to_reply[gen_r_id] = {node_to_rply, msg->id};
     string newString;
     newString.resize(length);
-    memcpy((char *) newString.data(), msg->payload + sizeof(int), length);
+    memcpy((char *)newString.data(), msg->payload + sizeof(int), length);
+    cout << "trail: " << trail << endl;
     cout << "getting len: " << length << ". msg: " << newString;// << endl;
+    message input_msg;
     while (trail > 0) {
-        memcpy(&length, &msg->payload, sizeof(int));
-        read(ret, &msg, sizeof(msg));
-        newString.resize(length);
-        memcpy((char *) newString.data(), msg->payload + sizeof(int), length);
-        cout << newString;
+        read(ret, &input_msg, sizeof(input_msg));
+        memcpy(&length, &input_msg.payload, sizeof(int));
+        string new_string;
+        new_string.resize(length);
+        memcpy((char*)new_string.data(), input_msg.payload + sizeof(int), length);
+        cout << new_string;
         trail--;
     }
     cout << endl;
@@ -691,9 +689,9 @@ void input_relay(message *msg, int ret) {
     memcpy(&src, &msg->src, sizeof(int));
     node_to_reply[general_request_id] = {msg->src, msg->id};
     cout << "trail: " << trail << ". dest: " << dest << ". src: " << src << ". node to reply: " << node_to_reply[general_request_id].first << endl;
-    char pipe[512 * trail];
+    char pipe[512 * (trail)];
     read(ret, pipe, sizeof(pipe));
-    write(sockets[dest], &pipe, 512 * trail);
+    write(sockets[dest], &pipe, sizeof(pipe));
 }
 
 /* ------------------------------ DELETE INPUT ----------------------------------- */
@@ -972,14 +970,14 @@ void send_relay(int destination, int original_id) {
         return;
     }
     int length = waze[destination].size();
-    char pipe[512 * (length)];
     message relays;
     relays.funcID = 64;
     int msg_id = random(); /* general request id since we call send_relay once */
     node_to_reply[msg_id] = {-1, -1};
     int txt_length;
     txt_length = strlen(text[destination].c_str());
-    int num_of_messages = floor(txt_length / 484);//number of messages after the first send
+    int num_of_messages = ceil(txt_length / 480.0)-1;//number of send messages after first send message
+    char pipe[(512 * (length+num_of_messages))];
     /* starting from 1 to length-1.
        from 1 because the first message is read by the first node to which it is sent
        to length-1 because the last message is "send" message and not "relay" message */
@@ -988,8 +986,8 @@ void send_relay(int destination, int original_id) {
         if (i==1) relays.src = id; /* the source of the first relay message is the source itdelf */
         else relays.src = waze[destination][i-2];
         relays.dest = waze[destination][i]; /* assuming node i-1. prev = i-2. next = i */
-        relays.trailMSG = length - i;
         int len = length - i + num_of_messages;
+        relays.trailMSG = len;
         memcpy(relays.payload, &waze[destination][i], sizeof(int));
         memcpy(relays.payload + sizeof(int), &len, sizeof(int));
         memcpy(relays.payload + 2 * sizeof(int), &msg_id, sizeof(int));
@@ -1000,15 +998,15 @@ void send_relay(int destination, int original_id) {
     msg.src = id;
     msg.dest = destination;
     int text_len = 480;
-    for (int i = 0; i < num_of_messages + 1; i++) {
+    for (int i = 0; i < num_of_messages+1; i++) {
         msg.funcID = 32;
         if (i != num_of_messages) {//if i is not the last message put 480 in the message length
             memcpy(msg.payload + sizeof(int), txt_to_send.substr(i * 480,  480).c_str(), 480);
+            cout << "len: " << text_len << ". msg: " << txt_to_send.substr(i * 480, 480) << endl;
             memcpy(msg.payload, &text_len, sizeof(int));
             memcpy(msg.payload + 484, &waze[destination][length-2], sizeof(int)); /* last node before dest */
             memcpy(msg.payload + 484 + sizeof(int), &msg_id, sizeof(int)); /* general request id */
-        }
-        else { /* if i is the last message put the remaining chars into the message */
+        } else { /* if i is the last message put the remaining chars into the message */
             int remaininglen=txt_length%480!=0?txt_length%480:480;
             memcpy(msg.payload + sizeof(int), txt_to_send.substr(i * 480, remaininglen).c_str(), remaininglen);
             cout << "len: " << remaininglen << ". msg: " << txt_to_send.substr(i * 480, remaininglen) << endl;
@@ -1017,6 +1015,7 @@ void send_relay(int destination, int original_id) {
             memcpy(msg.payload + 484 + sizeof(int), &msg_id, sizeof(int)); /* general request id */
         }
         msg.trailMSG = num_of_messages-i;
+        cout << "wow!" << endl;
         memcpy(pipe + (i + length - 1) * sizeof(message), &msg, sizeof(msg));
     }
     cout << "sending len: " << txt_length << ". msg: " << txt_to_send << endl;
