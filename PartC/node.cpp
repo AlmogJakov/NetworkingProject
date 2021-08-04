@@ -10,6 +10,7 @@
 #include <time.h>
 #include <netdb.h> /* addrinfo */
 
+#include <bits/stdc++.h> /* INT_MIN */
 #include <numeric> /* accumulate */
 #include <set>
 #include <list>
@@ -47,6 +48,13 @@
 |                                                | LAST MSG ID | FUNC ID TO NACK TO |             |
 |_________________________________________________________________________________________________|
 
+~   ~   ~   ~   ~   ~   ~   ~   ~ REFRESH NACK HEADER ~   ~   ~   ~   ~   ~   ~   ~   ~
+ ________________________________________________________________________________________________________
+| MSG ID | SRC ID | DST ID | TRAIL MSG | FUNC ID |                       PAYLOAD                         |
+|--------------------------------------------------------------------------------------------------------|
+|                                                | LAST MSG ID | FUNC ID TO NACK TO | GENERAL REQUEST ID |
+|________________________________________________________________________________________________________|
+
 ~   ~   ~   ~   ~   ~   ~   ~   ~ ROUTE HEADER ~   ~   ~   ~   ~   ~   ~   ~   ~
  ____________________________________________________________________________________________________
 | MSG ID | SRC ID | DST ID | TRAIL MSG | FUNC ID |                     PAYLOAD                       |
@@ -82,7 +90,7 @@
 |                                                | TEXT LEN | TEXT . . . | NODE TO REPLY | GENERAL REQUEST ID |
 |_____________________________________________________________________________________________________________|
 
-~   ~   ~   ~   ~   ~   ~   ~   DELETE HEADER   ~   ~   ~   ~   ~   ~   ~   ~
+~   ~   ~   ~   ~   ~   ~   ~   REFRESH HEADER   ~   ~   ~   ~   ~   ~   ~   ~
  _______________________________________________________________________________________
 | MSG ID | SRC ID | DST ID | TRAIL MSG | FUNC ID |               PAYLOAD                |
 |---------------------------------------------------------------------------------------|
@@ -92,7 +100,7 @@
 */
 
 /* my id */
-int id;
+int id = INT_MIN;
 /* key - neighbor id. value - socket. */
 unordered_map<int,unsigned int> sockets; // const unsigned int
 /* Note! to get the neighbors we can iterate thru this map keys. */
@@ -106,7 +114,7 @@ unordered_map<int,vector<int>> checkpoint_waze;
 /* storing the nodes left to the router from this node (usable by methods like discover method) */
 unordered_map<int,set<int>> nodes_to_request;
 /* save the source first neighbors */
-unordered_map<int,set<int>> first_src_neis;
+//unordered_map<int,set<int>> first_src_neis;
 /* saves the data of the node to which an answer should be returned.
    key: source id (e.g general_request_id). 
    value: pair (first - the node id to reply. second - last message id) */
@@ -178,7 +186,11 @@ int main(int argc, char *argv[]) {
             ss << buff;
             string splited[4]; // split std input
             getline(ss,splited[0],',');
-            if (splited[0].compare("setid")==0) {std_setid(ss,splited);}
+            /* if set id == NULL the only command that could be executed is 'setid' */
+            if (splited[0].compare("setid")!=0 && id == INT_MIN) {
+                cout << "NACK" << endl;
+                continue;
+            }else if (splited[0].compare("setid")==0) {std_setid(ss,splited);}
             else if (splited[0].compare("connect")==0) {std_connect(ss,splited);}
             else if (splited[0].compare("send")==0) {std_send(ss,splited);}
             else if (splited[0].compare("route")==0) {std_route(ss,splited);}
@@ -195,6 +207,11 @@ int main(int argc, char *argv[]) {
             /* get the message to struct */
             message* incoming = (message*)malloc(sizeof(message));
             int bytes_readed = read(ret ,incoming, 512);
+            /* id is not setted! return nack */
+            if (id==INT_MIN) {
+                send_nack(incoming,ret);
+                continue;
+            }
             /* if 0 bytes were called from the socket. The socket has disconnected! */
             if (bytes_readed==0) {
                 /* remove the socket from "sockets"! */
@@ -302,18 +319,17 @@ void std_send(stringstream& ss,string splited[]) {
         send(sockets.at(outgoing.dest), outgoing_buffer, sizeof(outgoing_buffer), 0);
     } else { /* not connected directly. we need to discover/relay&send. */
         text[stoi(splited[1])] = splited[3];
+        int general_req_id = rand();
         if(waze.find(stoi(splited[1]))==waze.end()){ /* no path! lets discover */
-            int original_id = rand();
-            node_to_reply[original_id] = {-1, -1}; /* source node! stop condition */
+            node_to_reply[general_req_id] = {-1, -1}; /* source node! stop condition */
             for(auto nei : sockets) {
-                cout << "inserting " << nei.first << " to first_src_neis list.." << endl;
-                first_src_neis[stoi(splited[1])].insert(nei.first);
+                cout << "inserting " << nei.first << " to nodes_to_request list.." << endl;
+                nodes_to_request[general_req_id].insert(nei.first);
             }
-            send_discover(stoi(splited[1]),original_id);}
+            send_discover(stoi(splited[1]),general_req_id);}
         else { /* if there is already a path */
-            int original_id = rand();
-            node_to_reply[original_id] = {-1, -1}; /* source node! stop condition */
-            send_relay(stoi(splited[1]),original_id);
+            node_to_reply[general_req_id] = {-1, -1}; /* source node! stop condition */
+            send_relay(stoi(splited[1]),general_req_id);
         }
     }
 }
@@ -342,13 +358,13 @@ void std_route(stringstream& ss,string splited[]) {
         cout << "NACK" << endl;
         return;
     }
-    int original_id = rand();
-    node_to_reply[original_id] = {-1, -1}; /* source node! stop condition */
+    int general_req_id = rand();
+    node_to_reply[general_req_id] = {-1, -1}; /* source node! stop condition */
     for(auto nei : sockets) {
-        cout << "inserting " << nei.first << " to first_src_neis list.." << endl;
-        first_src_neis[stoi(splited[1])].insert(nei.first);
+        cout << "inserting " << nei.first << " to general_req_id list.." << endl;
+        nodes_to_request[general_req_id].insert(nei.first);
     }
-    send_discover(stoi(splited[1]),original_id);
+    send_discover(stoi(splited[1]),general_req_id);
 }
 
 /* ------------------------------ PEERS (STDIN) --------------------------------- */
@@ -365,7 +381,7 @@ void std_peers(stringstream& ss,string splited[]) {
 }
 
 /* --------------------------------- DELETE ------------------------------------ */
-void std_refresh(int original_id) {
+void std_refresh(int general_req_id) {
     if (!waze.empty()) {
         waze.clear();
         cout << "waze cleared!" << endl;
@@ -376,10 +392,10 @@ void std_refresh(int original_id) {
         return;
     }
     for (auto nei : sockets) {
-        cout << "inserting " << nei.first << " to first_src_neis list.." << endl;
-        nodes_to_request[original_id].insert(nei.first);
+        cout << "inserting " << nei.first << " to nodes_to_request list.." << endl;
+        nodes_to_request[general_req_id].insert(nei.first);
     }
-    send_refresh(original_id);
+    send_refresh(general_req_id);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -461,51 +477,41 @@ void input_nack(message* msg, int ret) {
     /* nack type is the function id that the nack returns for */
     int nack_type;
     memcpy(&nack_type, msg->payload+sizeof(int), sizeof(int)); /* save nack_type from msg payload */
-    if (nack_type==8) { /* respond to discover message */
+    if (nack_type==4) {
+        close(ret);
+        cout << "NACK" << endl;
+    } else if (nack_type==8) { /* respond to discover message */
         int general_request_id;
         int destination;
         memcpy(&general_request_id, msg->payload+2*sizeof(int), sizeof(int)); /* save general_request_id from msg payload */
         memcpy(&destination, msg->payload+3*sizeof(int), sizeof(int)); /* save destination from msg payload */
-        if (node_to_reply[general_request_id].first==-1) { /* were on source node! */
-            first_src_neis[destination].erase(msg->src); /* remove the current node from neighbors */
-            if (first_src_neis[destination].size()>0) { /* there are more neighbors. keep discovering! */
-                send_discover(destination,general_request_id);
-                return;
-            } else { /* returned to source node. finish! */
-                if (checkpoint_waze.count(destination)!=0) { /* found path! */
-                    waze[destination] = checkpoint_waze[destination]; /* copy temp to permanent list */
-                    checkpoint_waze.erase(destination); /* we found the route! delete partial routes */
-                    /* there is text to send so discover called by relay! call relay! */
-                    if (!text[destination].empty()) {
-                        send_relay(destination,general_request_id);
-                    } else { /* discover called by route! print the path! */
-                        int len = waze[destination].size();
-                        cout << "path: " << id << "->";
-                        for (int i = 0; i < len-1; i++) {
-                            cout << waze[destination][i] << "->";
-                        }
-                        cout << waze[destination][len-1] << endl;
+        if (checkpoint_waze.count(destination)!=0||waze.count(destination)!=0) { /* found path! */ /* ???????????????????????????????? */
+            if (node_to_reply[general_request_id].first==-1) { /* were on source node! */
+                waze[destination] = checkpoint_waze[destination]; /* copy temp to permanent list */
+                checkpoint_waze.erase(destination); /* we found the route! delete partial routes */
+                if (!text[destination].empty()) {
+                   send_relay(destination,general_request_id);
+                } else { /* discover called by route! print the path! */
+                    int len = waze[destination].size();
+                    cout << "path: " << id << "->";
+                    for (int i = 0; i < len-1; i++) {
+                        cout << waze[destination][i] << "->";
                     }
-                } else { /* didnt found path */
-                    cout << "sorry, didnt find path! :(" << endl;
+                    cout << waze[destination][len-1] << endl;
                 }
+            } else {
+                cout << "done searching! should return route!" << endl;
+                send_route(msg);
+                checkpoint_waze.erase(destination); /* we found the route! delete partial routes */
             }
-        } else { /* were on inner node! */
-            nodes_to_request[general_request_id].erase(msg->src); /* remove the current node from neighbors */
-            if (nodes_to_request[general_request_id].size()>0) { /* there are more neighbors. keep discovering! */
-                send_discover(destination,general_request_id);
-                return;
-            } else { /* done searching! */
-                /* lets check if we found path */
-                if (waze.count(general_request_id)!=0) { /* found path! */
-                    cout << "done searching! should return route!" << endl;
-                    send_route(msg);
-                    checkpoint_waze.erase(destination); /* we found the route! delete partial routes */
-                } else { /* done searching! but didnt find path :( */
-                    cout << "done searching! should return nack!" << endl;
-                    send_nack(msg);
-                }
+        } else { /* done searching! but didnt find path :( */
+            if (node_to_reply[general_request_id].first==-1) { /* were on source node! */
+                cout << "NACK" << endl;
+            } else {
+                cout << "done searching! should return nack!" << endl;
+                send_nack(msg);
             }
+               
         }
     } else if (nack_type == 64 || nack_type == 32) { /* respond to relay/send message */
         int general_request_id;
@@ -535,6 +541,10 @@ void input_nack(message* msg, int ret) {
 
 /* ------------------------------ CONNECT INPUT --------------------------------- */
 void input_connect(message* msg, int ret){
+    if (id==INT_MIN) {
+        send_nack(msg);
+        return;
+    }
     message rply; /* ack */
     rply.id=random();
     rply.src=id;
@@ -584,10 +594,8 @@ void input_discover(message* msg, int ret) {
     int general_request_id;
     memcpy(&destination, msg->payload, sizeof(int)); /* save destination from msg payload */
     memcpy(&general_request_id, msg->payload+sizeof(int), sizeof(int)); /* save general_request_id from msg payload */
-    /* if we got discover message so the current path could be wrong! erase the path if exists */
-    /* circle! cannot continue discovering! */
-    if ((node_to_reply[general_request_id].first!=-1&&nodes_to_request[general_request_id].size()>0)
-            ||(node_to_reply[general_request_id].first==-1&&first_src_neis[destination].size()>0)) {
+    /* reached to node in discover process. closed circle! */
+    if (nodes_to_request[general_request_id].size()>0) { 
         cout <<  msg->src <<" send to me (my id:" << id << ") and closed circle! return nack" << endl;
         send_nack(msg);
         return;
@@ -643,35 +651,26 @@ void input_route(message* msg, int ret) {
             }
         }
     }
-    if (node_to_reply[general_request_id].first==-1) { /* were on source node! */
-        cout << "src node.." << endl;
-        first_src_neis[destination].erase(msg->src); /* remove the current node from neighbors */
-        if (first_src_neis[destination].size()>0) { /* there are more neighbors. keep discovering! */
-            send_discover(destination,general_request_id);
-            return;
-        } else { /* we visited all the nodes & returned to source node. finish! */
+    nodes_to_request[general_request_id].erase(msg->src); /* remove the current node from neighbors */
+    if (nodes_to_request[general_request_id].size()>0) { /* there are more neighbors. keep discovering! */
+        send_discover(destination,general_request_id);
+        return;
+    } else { /* done discovering */
+        if (node_to_reply[general_request_id].first==-1) { /* were on source node! */
             waze[destination] = checkpoint_waze[destination];
             checkpoint_waze.erase(destination); /* we found the route! delete partial routes */
-                /* there is text to send so discover called by relay! call relay! */
-                if (!text[destination].empty()) {
-                    send_relay(destination,general_request_id);
-                } else { /* discover called by route! print the path! */
-                    int len = waze[destination].size();
-                    cout << "path: " << id << "->";
-                    for (int i = 0; i < len-1; i++) {
-                        cout << waze[destination][i] << "->";
-                    }
-                    cout << waze[destination][len-1] << endl;
+            /* there is text to send so discover called by relay! call relay! */
+            if (!text[destination].empty()) {
+                send_relay(destination,general_request_id);
+            } else { /* discover called by route! print the path! */
+                int len = waze[destination].size();
+                cout << "path: " << id << "->";
+                for (int i = 0; i < len-1; i++) {
+                    cout << waze[destination][i] << "->";
                 }
-            return;
-        }
-    } else { /* were on inner node! */
-        cout << "inner node.." << endl;
-        nodes_to_request[general_request_id].erase(msg->src); /* remove the current node from neighbors */
-        if (nodes_to_request[general_request_id].size()>0) { /* there are more neighbors. keep discovering! */
-            send_discover(destination,general_request_id);
-            return;
-        } else { /* should return route to prev node */
+                cout << waze[destination][len-1] << endl;
+            }
+        } else { /* were on inner node. should return route to prev node */
             cout << "sending route.." << endl;
             send_route(msg);
             checkpoint_waze.erase(destination);
@@ -813,7 +812,7 @@ void send_route(message *msg) {
 }
 
 /* ------------------------------- SEND NACK ------------------------------------ */
-void send_nack(message* msg) {
+void send_nack(message* msg, int ret) {
     int destination, general_request_id;
     message rply; /* nack */
     rply.id=random();
@@ -821,7 +820,14 @@ void send_nack(message* msg) {
     rply.dest = msg->src;
     rply.trailMSG=0;
     rply.funcID=2;
-    if (msg->funcID==2) { /* respond to nack message */
+    if (msg->funcID==4) { /* respond to connect message */
+        /* id = INT_MIN. return nack! */
+        memcpy(rply.payload, &msg->id, sizeof(int));
+        memcpy(rply.payload+sizeof(int), &msg->funcID, sizeof(int));
+        write(ret,&rply,sizeof(rply));
+        close(ret);
+        return;
+    } else if (msg->funcID==2) { /* respond to nack message */
         int nack_type;
         memcpy(&nack_type, msg->payload+sizeof(int), sizeof(int));
         /* read and write data to payload in accordance to the nack type */
@@ -831,7 +837,7 @@ void send_nack(message* msg) {
             int prev_node = node_to_reply[general_request_id].first;
             rply.dest = prev_node;
             /* write to the new message */
-            memcpy(rply.payload, &prev_node,sizeof(int));
+            memcpy(rply.payload, &node_to_reply[general_request_id].second,sizeof(int));
             memcpy(rply.payload+1*sizeof(int), &nack_type,sizeof(int));
             memcpy(rply.payload+2*sizeof(int), &general_request_id,sizeof(int));
             memcpy(rply.payload+3*sizeof(int), &destination,sizeof(int));
@@ -850,10 +856,10 @@ void send_nack(message* msg) {
             rply.dest = prev_node;
             cout << "nack for nack. sending nack to " << rply.dest << endl;
             /* write to the new message */
-            memcpy(rply.payload, &prev_node, sizeof(int));
+            //memcpy(rply.payload, &prev_node, sizeof(int));
+            memcpy(rply.payload, &node_to_reply[general_request_id].second,sizeof(int));
             memcpy(rply.payload + 1 * sizeof(int), &nack_type, sizeof(int));
             memcpy(rply.payload + 2 * sizeof(int), &general_request_id, sizeof(int));
-            // memcpy(rply.payload + 3 * sizeof(int), &destination, sizeof(int));
         }
     } else if (msg->funcID==8) { /* respond to discover message */
         int nack_type = 8;
@@ -944,16 +950,10 @@ void send_discover(int dst, int general_request_id) { /* first discover from the
     message outgoing;
     outgoing.id = rand();
     int first_nei;
-    if (node_to_reply[general_request_id].first==-1) { /* src node! */
-        node_to_reply[outgoing.id] = {-1, -1}; /* source node! add to the new id an stop condition */
-        first_nei = *first_src_neis[dst].begin();
-        /* override new discover id */
-        memcpy(outgoing.payload+sizeof(int), &outgoing.id, sizeof(int));
-    } else { /* inner node */
-        first_nei = *nodes_to_request[general_request_id].begin();
-        /* add discover id to payload */
-        memcpy(outgoing.payload+sizeof(int), &general_request_id, sizeof(int));
-    }
+    /* already setted node_to_reply[outgoing.id] = {-1, -1} outside this method */
+    first_nei = *nodes_to_request[general_request_id].begin();
+    /* add discover id to payload */
+    memcpy(outgoing.payload+sizeof(int), &general_request_id, sizeof(int));
     outgoing.src = id;
     outgoing.dest = first_nei;
     outgoing.trailMSG = 0;

@@ -55,11 +55,11 @@ void std_connect(stringstream& ss,string splited[]);
 void std_route(stringstream& ss,string splited[]);
 void std_peers(stringstream& ss,string splited[]);
 
-void std_refresh(int original_id);
+void std_refresh(int general_req_id);
 void send_refresh(int general_request_id);
 void input_refresh(message *msg);
 
-void send_nack(message* msg);
+void send_nack(message* msg, int ret = -1);
 void send_ack(message* msg);
 void send_route(message* msg);
 void send_discover(int dst, int discover_id);
