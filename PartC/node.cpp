@@ -149,7 +149,7 @@ int main(int argc, char *argv[]) {
         cout << "MY ID: " << id << endl;
         cout << "\033[0m"; /* end print in color */
     } 
-    char buff[1025];
+    char buff[256];
     // time_t ticks;
     innerfd = socket(AF_INET, SOCK_STREAM, 0);
     int enable = 1;
@@ -164,7 +164,7 @@ int main(int argc, char *argv[]) {
     bind(innerfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
     printf("adding fd(%d) to monitoring\n", innerfd); /* TODO: remove line */
     add_fd_to_monitoring(innerfd);
-    listen(innerfd, 10);
+    listen(innerfd, 100);
 
     while(true){
         memset(&buff, '\0', sizeof(buff));
@@ -175,11 +175,16 @@ int main(int argc, char *argv[]) {
            stdout is defined to be file descriptor 1,
            and stderr is defined to be file descriptor 2. */
         if (ret < 2) { // std input
-            read(ret, buff, 2050); // 1025
-            if (buff[strlen(buff)-1]=='\n') buff[strlen(buff)-1] = '\0';
             stringstream ss;
-            ss << buff;
-            string splited[4]; // split std input
+            while(read(ret, buff, 256)>0) {
+                ss << buff;
+                if (buff[strlen(buff)-1]=='\n'||buff[strlen(buff)-1]=='\r') {
+                    buff[strlen(buff)-1] = '\0';
+                    break;
+                }
+                memset(&buff, '\0', sizeof(buff));
+            }
+            string splited[4]; /* split std input */
             getline(ss,splited[0],',');
             /* if set id == NULL the only command that could be executed is 'setid' */
             if (splited[0].compare("setid")!=0 && id == INT_MIN) {
