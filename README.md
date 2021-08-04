@@ -66,21 +66,23 @@ Contains a number of data structures in order to perform mutual communication op
 - **std_send(#param)** - TODO: Explanations..
 - **std_route(#param)** - TODO: Explanations..
 - **std_peers(#param)** - TODO: Explanations..
+	
 - **gotmsg(#param)** - TODO: Explanations..
-- **ack(#param)** - TODO: Explanations..
-- **nack(#param)** - TODO: Explanations..
-- **cnct(#param)** - TODO: Explanations..
-- **Send(#param)** - TODO: Explanations..
-- **discover(#param)** - TODO: Explanations..
-- **route(#param)** - TODO: Explanations..
-- **relay(#param)** - TODO: Explanations..
-- **del(#param)** - TODO: Explanations..
+- **input_ack(#param)** - TODO: Explanations..
+- **input_nack(#param)** - TODO: Explanations..
+- **input_connect(#param)** - TODO: Explanations..
+- **input_send(#param)** - TODO: Explanations..
+- **input_discover(#param)** - TODO: Explanations..
+- **input_route(#param)** - TODO: Explanations..
+- **input_relay(#param)** - TODO: Explanations..
+- **input_refresh(#param)** - TODO: Explanations..
+	
 - **send_route(#param)** - TODO: Explanations..
 - **send_nack(#param)** - TODO: Explanations..
 - **send_ack(#param)** - TODO: Explanations..
 - **send_discover(#param)** - TODO: Explanations..
 - **send_relay(#param)** - TODO: Explanations..
-- **send_Del(#param)** - TODO: Explanations..
+- **send_refresh(#param)** - TODO: Explanations..
 
 <h2> 'Select' Class (Implements listening to sockets): </h2>
 
