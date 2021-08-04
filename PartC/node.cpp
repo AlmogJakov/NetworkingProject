@@ -5,7 +5,7 @@
 #include <unordered_map> /* e.g sockets unordered_map */
 #include <vector> /* e.g waze vector */
 #include <sstream> /* stdin input to sstream */
-#include <cmath> /* floor */
+#include <cmath> /* floor/ceil */
 #include <fcntl.h> /* set socket to unblocked/blocked */
 #include <unistd.h> /* read/write/close */
 #include <arpa/inet.h> /* inet_ntop */
@@ -435,8 +435,9 @@ void input_nack(message* msg, int ret) {
     int nack_type;
     memcpy(&nack_type, msg->payload+sizeof(int), sizeof(int)); /* save nack_type from msg payload */
     if (nack_type==4) {
-        close(ret);
+        //close(ret);
         cout << "nack" << endl;
+        return;
     } else if (nack_type==8) { /* respond to discover message */
         int general_request_id;
         int destination;
