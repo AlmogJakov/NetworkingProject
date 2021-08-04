@@ -16,6 +16,7 @@
 #include <vector> /* e.g waze vector */
 #include <sstream> /* stdin input to sstream */
 #include <cmath> /* floor */
+#include <fcntl.h>
 
 #include "select.hpp"
 #include "node.hpp"
@@ -164,7 +165,7 @@ int main(int argc, char *argv[]) {
     bind(innerfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
     printf("adding fd(%d) to monitoring\n", innerfd); /* TODO: remove line */
     add_fd_to_monitoring(innerfd);
-    listen(innerfd, 100);
+    listen(innerfd,100);
 
     while(true){
         memset(&buff, '\0', sizeof(buff));
@@ -175,17 +176,20 @@ int main(int argc, char *argv[]) {
            stdout is defined to be file descriptor 1,
            and stderr is defined to be file descriptor 2. */
         if (ret < 2) { // std input
+            /* unblock read from socket ret for the purpose of ending the next while loop */
+            fcntl(ret, F_SETFL, SOCK_NONBLOCK); 
             stringstream ss;
-            while(read(ret, buff, 256)>0) {
+            read(ret, buff, 256);
+            while(1) {
                 ss << buff;
-                if (buff[strlen(buff)-1]=='\n'||buff[strlen(buff)-1]=='\r') {
-                    buff[strlen(buff)-1] = '\0';
-                    break;
-                }
                 memset(&buff, '\0', sizeof(buff));
+                if (read(ret, buff, 256)<=0) break;
             }
+            /* set back socket ret to blocked */
+            ret = ret & (~O_NONBLOCK);
             string splited[4]; /* split std input */
             getline(ss,splited[0],',');
+            if (splited[0].at(splited[0].size()-1)=='\n') {splited[0].pop_back();} /* peers'\n' to peers */
             /* if set id == NULL the only command that could be executed is 'setid' */
             if (splited[0].compare("setid")!=0 && id == INT_MIN) {
                 cout << "NACK" << endl;
@@ -297,6 +301,7 @@ void std_connect(stringstream& ss,string splited[]) {
 void std_send(stringstream& ss,string splited[]) {
     getline(ss,splited[1],','); /* destination */
     getline(ss,splited[2],','); /* message length */
+    if (splited[2].at(splited[2].size()-1)=='\n') {splited[2].pop_back();}
     //getline(ss,splited[3],','); /* message itself */
     splited[3].resize(stoi(splited[2]));
     getline(ss, splited[3]); /* message itself */
@@ -304,22 +309,14 @@ void std_send(stringstream& ss,string splited[]) {
         cout << "NACK" << endl;
         return;
     }
+    int general_req_id = rand();
     if (sockets.find(stoi(splited[1]))!=sockets.end()) { /* connected directly. send the message! */
-        message outgoing;
-        outgoing.id = rand();
-        outgoing.src = id;
-        outgoing.dest = stoi(splited[1]);
-        outgoing.trailMSG = 0;
-        outgoing.funcID = 32; /* send function id is 32 */
-        int msg_len = stoi(splited[2]);
-        memcpy(outgoing.payload, &msg_len, sizeof(int));
-        memcpy(outgoing.payload+sizeof(int), splited[3].c_str(), msg_len); /* set the payload */
-        char outgoing_buffer[512];
-        memcpy(outgoing_buffer, &outgoing, sizeof(outgoing));
-        send(sockets.at(outgoing.dest), outgoing_buffer, sizeof(outgoing_buffer), 0);
+        waze[stoi(splited[1])].push_back(stoi(splited[1]));
+        text[stoi(splited[1])] = splited[3];
+        node_to_reply[general_req_id] = {-1, -1}; /* source node! stop condition */
+        send_relay(stoi(splited[1]),general_req_id);
     } else { /* not connected directly. we need to discover/relay&send. */
         text[stoi(splited[1])] = splited[3];
-        int general_req_id = rand();
         if(waze.find(stoi(splited[1]))==waze.end()){ /* no path! lets discover */
             node_to_reply[general_req_id] = {-1, -1}; /* source node! stop condition */
             for(auto nei : sockets) {
@@ -908,6 +905,7 @@ void send_ack(message *msg) {
         memcpy(reply.payload, &node_to_reply[gen_r_id].second, sizeof(int));//writing the last msg id
         memcpy(reply.payload + sizeof(int), &msg->funcID, sizeof(int));//writing func id
         memcpy(reply.payload + 2 * sizeof(int), &gen_r_id, sizeof(int));//writing the gen_r_id
+        // if (sockets.count(msg->src)!=0) reply.dest = msg->src;
         reply.dest = node_to_reply[gen_r_id].first; // didnt saved it! junk data!
         cout << "len :" << length << ". sending ack to: " << reply.dest << endl;
     } else if (msg->funcID == 128) {
@@ -974,7 +972,12 @@ void send_relay(int destination, int original_id) {
         cout << "Nack" << endl;
         return;
     }
-    int length = waze[destination].size();
+    // if (sockets.find(destination) != sockets.end()) {
+    //     int length = 1;
+    // } else {
+    //     int length = waze[destination].size(); 
+    // }
+    int length = waze[destination].size(); 
     message relays;
     relays.funcID = 64;
     int msg_id = random(); /* general request id since we call send_relay once */
@@ -1003,20 +1006,24 @@ void send_relay(int destination, int original_id) {
     msg.src = id;
     msg.dest = destination;
     int text_len = 480;
+    /* "for" loop for writing all parts of send messages */
     for (int i = 0; i < num_of_messages+1; i++) {
         msg.funcID = 32;
+        /* if destination is a neighbor node_to_reply = current node */
+        if (sockets.find(destination) != sockets.end()) {memcpy(msg.payload + 484, &id, sizeof(int));
+        /* else, the route>=2 so node_to_reply = waze[destination][length-2] */
+        } else {memcpy(msg.payload + 484, &waze[destination][length-2], sizeof(int));} /* last node before dest */
+        /* build the messages depending on their length */
         if (i != num_of_messages) {//if i is not the last message put 480 in the message length
             memcpy(msg.payload + sizeof(int), txt_to_send.substr(i * 480,  480).c_str(), 480);
             cout << "len: " << text_len << ". msg: " << txt_to_send.substr(i * 480, 480) << endl;
             memcpy(msg.payload, &text_len, sizeof(int));
-            memcpy(msg.payload + 484, &waze[destination][length-2], sizeof(int)); /* last node before dest */
             memcpy(msg.payload + 484 + sizeof(int), &msg_id, sizeof(int)); /* general request id */
         } else { /* if i is the last message put the remaining chars into the message */
             int remaininglen=txt_length%480!=0?txt_length%480:480;
             memcpy(msg.payload + sizeof(int), txt_to_send.substr(i * 480, remaininglen).c_str(), remaininglen);
             cout << "len: " << remaininglen << ". msg: " << txt_to_send.substr(i * 480, remaininglen) << endl;
             memcpy(msg.payload, &remaininglen, sizeof(int));
-            memcpy(msg.payload + 484, &waze[destination][length-2], sizeof(int)); /* last node before dest */
             memcpy(msg.payload + 484 + sizeof(int), &msg_id, sizeof(int)); /* general request id */
         }
         msg.trailMSG = num_of_messages-i;
