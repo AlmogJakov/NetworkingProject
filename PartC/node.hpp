@@ -48,7 +48,7 @@ void input_relay(message* msg, int ret);
 
 // returns the type name of the message
 string message_type(message* msg);
-
+ 
 void std_setid(stringstream& ss,string splited[]);
 void std_send(stringstream& ss,string splited[]);
 void std_connect(stringstream& ss,string splited[]);
@@ -64,3 +64,5 @@ void send_ack(message* msg);
 void send_route(message* msg);
 void send_discover(int dst, int discover_id);
 void send_relay(int destination,int original_id);
+
+void print_ip_info(int r_port);
