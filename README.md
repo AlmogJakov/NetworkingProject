@@ -65,7 +65,7 @@ Contains a number of data structures in order to perform mutual communication op
 - **std_connect(#param)** - TODO: Explanations..
 - **std_send(#param)** - TODO: Explanations..
 - **std_route(#param)** - TODO: Explanations..
-- **std_peers(#param)** - TODO: Explanations..
+- **std_peers(#param)** - TODO: Explanations..    
 	
 - **gotmsg(#param)** - TODO: Explanations..
 - **input_ack(#param)** - TODO: Explanations..
@@ -75,7 +75,7 @@ Contains a number of data structures in order to perform mutual communication op
 - **input_discover(#param)** - TODO: Explanations..
 - **input_route(#param)** - TODO: Explanations..
 - **input_relay(#param)** - TODO: Explanations..
-- **input_refresh(#param)** - TODO: Explanations..
+- **input_refresh(#param)** - TODO: Explanations..    
 	
 - **send_route(#param)** - TODO: Explanations..
 - **send_nack(#param)** - TODO: Explanations..
