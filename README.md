@@ -95,15 +95,71 @@ The following actions can be performed:
 -----
 
 # UDP IPv4 VS IPv6
-In this implementation we develop a node in a network where communication between different nodes is possible. The nodes do not necessarily communicate directly with each other, and they can communicate through other nodes.
+Diagnosing the difference between the HEADER of IPV4 versus IPV6 under UDP protocol.
 	
-</table>
+<h3>Before running the server:</h3>
+<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/show-netstat-before.jpg" width="60%"/></p>
+	
+<h3>After running the server:</h3>
+<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/show-netstat-after.jpg" width="60%"/></p>
+	
+Note that the flag '-n' (netstat -a **-n**) shows network addresses as numbers. When this flag is not specified, the netstat command interprets addresses where possible and displays them symbolically. This flag can be used with any of the display formats. (source: https://www.ibm.com/docs/en/power8/8408-44E?topic=commands-netstat-command)
+<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/flag-netstat.jpg"/></p>
+	
+<h3>IPV4 Client Header:</h3>
+<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ipv4-header-client.jpg" width="60%"/></p>
+	
+<h3>IPV4 Server Header:</h3>
+<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ipv4-header-server.jpg" width="60%"/></p>
+	
+<h3>IPV6 Client Header:</h3>
+<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ipv6-header-client.jpg" width="60%"/></p>
+	
+<h3>IPV6 Server Header:</h3>
+<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ipv6-header-server.jpg" width="60%"/></p>
+	
+<h3>Ping execution:</h3>
+<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ping.jpg" width="60%"/></p>
+	
+<h3>Differences between IPV4 and IPV6:</h3>    
+	
+- In IPV6 there is no fragmentation. The sender must send packages of the appropriate size and not packages that are too large.  
+- In IPV6 there is no checksum because it already exists in the transport layer and the data link layer.  
+- The options field does not exist but may have a pointer in the Next Header field.  
+- In IPV6 the addresses are 128 bits long as opposed to IPV4 where the addresses are 32 bits long.  
+	
+<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ipv4VSipv6.jpg"/></p>
+(source: https://www.juniper.net/us/en/research-topics/what-is-ipv4-vs-ipv6.html)
 
 -----
 
 # UDP Pinger
-In this implementation we develop a node in a network where communication between different nodes is possible. The nodes do not necessarily communicate directly with each other, and they can communicate through other nodes.
+Implementation of sending ping under UDP protocol while losing packets (randomly).
+The program prints the values: Average RTT, Maximum RTT, Minimum RTT, Packet Loss.
 	
-</table>
+<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartA/images/udp-pinger.jpg"/></p>
 
 -----
+
+<h3>UDPHeartBeat</h3>
+	
+Another implementation is UDPHeartBeat, this implementation is the same as the implementation above and in addition:  
+	
+<b>Server side:</b>   
+	
+- report time differences from the last packet sent by the client.  
+- reporting loss of packets.  
+- estimated reporting if client disconnected.  
+	
+	
+
+<b>Client side:</b>   
+	
+- print the input from the server.  
+- print the RTT value.  
+	
+<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartA/images/udp-pinger-heartBeat.jpg"/></p>
+
+-----
+Almog Jakov: https://github.com/AlmogJakov  
+Tal Somech: https://github.com/TalSomech  
