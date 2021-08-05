@@ -2,8 +2,7 @@
 # We will need the following module to generate randomized lost packets
 import time
 from socket import *
-# Create a UDP socket
-# Notice the use of SOCK_DGRAM for UDP packets
+# Create a UDP socket, use of SOCK_DGRAM for UDP packets
 serverSocket = socket(AF_INET, SOCK_DGRAM)
 # unblocked option for recvfrom() method
 serverSocket.settimeout(0)
@@ -15,26 +14,25 @@ connected = False
 while True:
     # Receive the client packet along with the address it is coming from
     try:
+        # unblocked to indicate if client disconnected
         message, address = serverSocket.recvfrom(1024)
         connected = True
         message_array = message.decode().split(' ')
         message_seq = int(message_array[1])
-        message_time = int(message_array[2])
+        message_time = float(message_array[2])
         if message_seq != current_sequence + 1:
             for i in range(current_sequence + 1, message_seq):
                 print("Lost Packet %s" % i)
         current_sequence = message_seq
-        print("Got Packet %s | Time: %s" % (message_seq, time.strftime('%H:%M:%S', time.gmtime(message_time))))
+        print("Got Packet %s | TIME: %s" % (message_seq, time.time()-message_time))
         last_time = message_time
         # Capitalize the message from the client
-        # print(message.decode())
         message = message.upper()
-        # If rand is less is than 4, we consider the packet lost and do not respond
-        # Otherwise, the server responds
         serverSocket.sendto(message, address)
     except:
+        # if did not receive a packet for more then 5 seconds, assume client disconnected.
         if connected:
-            if (round(time.time()) - last_time) > 5:
+            if (time.time() - last_time) > 5:
                 print("disconnected")
                 current_sequence = 0
                 connected = False

@@ -2,16 +2,8 @@
 import time
 from socket import *
 from datetime import datetime
-# my_ip = '5.29.33.158'
-# my_port = 1024
-# serv_ip = '109.66.22.227'
-# serv_port = 12000
 serverSocket = socket(AF_INET, SOCK_DGRAM)
 serverSocket.settimeout(1.0)
-# serverSocket.bind((my_ip, my_port))
-# serverSocket.bind(('127.0.0.1', 1024))
-# serverSocket.connect((my_ip, my_port))
-# serverSocket.connect((serv_ip, serv_port))
 sequence = 1
 packet_loss = 0
 packet_sent = 0
