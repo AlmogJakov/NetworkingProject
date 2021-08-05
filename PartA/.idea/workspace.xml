@@ -2,8 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="b3f3e5db-d6b7-46ab-b47e-579c7737ac5a" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/UDPHeartBeatClient.py" beforeDir="false" afterPath="$PROJECT_DIR$/UDPHeartBeatClient.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/UDPPingerClient.py" beforeDir="false" afterPath="$PROJECT_DIR$/UDPPingerClient.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

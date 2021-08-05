@@ -59,7 +59,8 @@ int main() {
 		printf("recvfrom() failed with error code  : %d\n", errno);
 		return -1;
 	}
-	printf(bufferReply);
+	//printf(bufferReply);
+	printf("%s", bufferReply);
 	close(s);
     return 0;
 }
