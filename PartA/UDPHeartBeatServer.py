@@ -16,15 +16,18 @@ while True:
     try:
         # unblocked to indicate if client disconnected
         message, address = serverSocket.recvfrom(1024)
-        connected = True
         message_array = message.decode().split(' ')
         message_seq = int(message_array[1])
         message_time = float(message_array[2])
+        # if the customer is currently logged in
+        if connected is False:
+            connected = True
+            last_time = message_time
         if message_seq != current_sequence + 1:
             for i in range(current_sequence + 1, message_seq):
                 print("Lost Packet %s" % i)
         current_sequence = message_seq
-        print("Got Packet %s | TIME: %s" % (message_seq, time.time()-message_time))
+        print("Got Packet %s | Time Difference: %s" % (message_seq, message_time-last_time))
         last_time = message_time
         # Capitalize the message from the client
         message = message.upper()
@@ -36,3 +39,4 @@ while True:
                 print("disconnected")
                 current_sequence = 0
                 connected = False
+                last_time = 0.0
