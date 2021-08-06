@@ -2,6 +2,7 @@
 import time
 from socket import *
 from datetime import datetime
+# from time import sleep
 serverSocket = socket(AF_INET, SOCK_DGRAM)
 serverSocket.settimeout(1.0)
 sequence = 1
@@ -22,6 +23,7 @@ while sequence <= 10:
     try:
         # message, address = serverSocket.recvfrom(serv_port)
         message, address = serverSocket.recvfrom(12000)
+        # sleep(0.05)
         rtt = time.time() - start_time
         sum_rtt += rtt
         if rtt < minimum_rtt:

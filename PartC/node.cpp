@@ -64,6 +64,20 @@
 |                                                | DEST | GENERAL REQUEST ID |          |
 |_______________________________________________________________________________________|
 
+~   ~   ~   ~   ~   ~   ~   ~   CONNECT HEADER   ~   ~   ~   ~   ~   ~   ~   ~
+ _______________________________________________________________________________________
+| MSG ID | SRC ID | DST ID | TRAIL MSG | FUNC ID |               PAYLOAD                |
+|---------------------------------------------------------------------------------------|
+|                                                | IP:PORT |                            |
+|_______________________________________________________________________________________|
+
+~   ~   ~   ~   ~   ~   ~   ~   ~ CONNECT ACK HEADER ~   ~   ~   ~   ~   ~   ~   ~   ~
+ __________________________________________________________________________________________________________
+| MSG ID | SRC ID | DST ID | TRAIL MSG | FUNC ID |                         PAYLOAD                         |
+|----------------------------------------------------------------------------------------------------------|
+|                                                | LAST MSG ID | FUNC ID TO ACK TO | IP:PORT LEN | IP:PORT |
+|__________________________________________________________________________________________________________|
+
 ~   ~   ~   ~   ~   ~   ~   ~ DISCOVER NACK HEADER ~   ~   ~   ~   ~   ~   ~   ~
  _______________________________________________________________________________________________________________
 | MSG ID | SRC ID | DST ID | TRAIL MSG | FUNC ID |                           PAYLOAD                            |
@@ -104,12 +118,16 @@ unordered_map<int,set<int>> nodes_to_request;
    key: source id (e.g general_request_id). 
    value: pair (first - the node id to reply. second - last message id) */
 unordered_map<int,pair<int, int>> node_to_reply;
+/* key - neighbor id. value - ip:port */
+unordered_map<int,string> ip_port;
+
+int r_port;
 
 int main(int argc, char *argv[]) {
     int innerfd = 0, outerfd=0;
-    struct sockaddr_in serv_addr; 
+    struct sockaddr_in serv_addr;
     int ret, i;
-    int r_port = 12345; /* default Port */
+    r_port = 12345; /* default Port */
     if (argc>1) {r_port = stoi(argv[1]);} /* set user input Port if received */
     if (argc>2) { /* set user input ID if received */
         id = stoi(argv[2]);
@@ -188,7 +206,8 @@ int main(int argc, char *argv[]) {
                 for(auto it = sockets.begin(); it != sockets.end(); it++) {
 	                if((it->second) == ret) {
                         removed_id = it->first; /* save the id of the removed node */
-		                sockets.erase(it->first);
+		                sockets.erase(it->first); /* remove fd of the socket */
+                        ip_port.erase(it->first); /* remove ip&port */
 		                break;}
                 }
                 /* when node disconnect, the general request id is the id of the deleted node.
@@ -254,6 +273,11 @@ void std_connect(stringstream& ss,string splited[]) {
     outgoing.dest = 0;
     outgoing.trailMSG = 0;
     outgoing.funcID = 4; /* connect function id is 4 */
+    /* send ip & port */
+    string ip_port = get_ip_port();
+    int ip_port_len = ip_port.size();
+    memcpy(outgoing.payload, &ip_port_len, sizeof(int));
+    memcpy(outgoing.payload+sizeof(int), ip_port.c_str(), ip_port_len);
     char outgoing_buffer[512];
     memcpy(outgoing_buffer, &outgoing, sizeof(outgoing));
     send(new_sock, outgoing_buffer, sizeof(outgoing_buffer), 0);
@@ -401,6 +425,13 @@ void input_ack(message *msg, int ret) {//,int messagenum){
         sockets[msg->src] = ret;
         cout << "ack" << endl;
         cout << msg->src << endl;
+        /* save ip & port */
+        string ip_and_port;
+        int ip_port_len;
+        memcpy(&ip_port_len, msg->payload + 2 * sizeof(int), sizeof(int));
+        ip_and_port.resize(ip_port_len);
+        memcpy((char*)ip_and_port.data(), msg->payload + 3 * sizeof(int), ip_port_len);
+        ip_port[msg->src] = ip_and_port;
         std_refresh(general_req_id);
     }
     if (ack_type == 32) { /* respond to ack of send message */
@@ -512,6 +543,13 @@ void input_connect(message* msg, int ret){
     rply.funcID=1;
     rply.dest=msg->src;
     sockets[msg->src] = ret;
+    /* get ip & port */
+    int ip_port_len;
+    string ip_and_port;
+    memcpy(&ip_port_len, msg->payload, sizeof(int));
+    ip_and_port.resize(ip_port_len);
+    memcpy((char*)ip_and_port.data(), msg->payload+sizeof(int) ,ip_port_len);
+    ip_port[msg->src] = ip_and_port;
     add_fd_to_monitoring(ret);
     write(ret,&rply,sizeof(rply));
 }
@@ -598,10 +636,14 @@ void input_route(message* msg, int ret) {
             checkpoint_waze[destination].push_back(way[i]);
         }
     } else if (length==checkpoint_waze[destination].size()) { // there is a path
-        if (accumulate(way.begin(),way.end(),0)<accumulate(checkpoint_waze[destination].begin(),checkpoint_waze[destination].end(), 0)) {
-            checkpoint_waze[destination].clear();
-            for (int i = 0; i < length; i++) {
-                checkpoint_waze[destination].push_back(way[i]);
+        //if (accumulate(way.begin(),way.end(),0)<accumulate(checkpoint_waze[destination].begin(),checkpoint_waze[destination].end(), 0)) {
+        for (int j = 0; j < length; j++) { /* lexicographic order */
+            if (way[j]<checkpoint_waze[destination][j]) {
+                checkpoint_waze[destination].clear();
+                for (int i = 0; i < length; i++) {
+                    checkpoint_waze[destination].push_back(way[i]);
+                }
+                break;
             }
         }
     }
@@ -821,7 +863,16 @@ void send_ack(message *msg) {
     reply.src = id;
     reply.funcID = 1;
     reply.trailMSG = 0;
-    if (msg->funcID == 32) { /* send */
+    if (msg->funcID == 4) { /* connect */
+            /* send ip & port */
+            string ip_and_port = get_ip_port();
+            int ip_port_len = ip_and_port.size();
+            int connect_type = 4;
+            memcpy(reply.payload, &msg->id, sizeof(int));//writing the last msg id
+            memcpy(reply.payload + sizeof(int), &connect_type, sizeof(int));//writing func id
+            memcpy(reply.payload + 2*sizeof(int), &ip_port_len ,sizeof(int));
+            memcpy(reply.payload + 3*sizeof(int), ip_and_port.c_str(), ip_port_len);
+    } else if (msg->funcID == 32) { /* send */
         int length;
         memcpy(&length, msg->payload, sizeof(int));
         memcpy(&gen_r_id, msg->payload + sizeof(int) + 484, sizeof(int));
@@ -890,11 +941,6 @@ void send_relay(int destination, int original_id) {
         cout << "nack" << endl;
         return;
     }
-    // if (sockets.find(destination) != sockets.end()) {
-    //     int length = 1;
-    // } else {
-    //     int length = waze[destination].size(); 
-    // }
     int length = waze[destination].size(); 
     message relays;
     relays.funcID = 64;
@@ -950,7 +996,7 @@ void send_relay(int destination, int original_id) {
     write(sockets[dest], &pipe, sizeof(pipe));
 }
 
-/* ------------------------------ SEND DELETE ----------------------------------- */
+/* ------------------------------ SEND REFRESH ----------------------------------- */
 void send_refresh(int general_request_id) {
     message del_msg;
     del_msg.id = random();
@@ -991,4 +1037,14 @@ void print_ip_info(int r_port) {
     /* Print my port */
     printf("MY PORT: %d\n", r_port);
     printf("---------------------------------\n");
+}
+
+string get_ip_port() {
+    struct sockaddr_in* pV4Addr = (struct sockaddr_in*)&inet_addr;
+    struct in_addr ipAddr = pV4Addr->sin_addr;
+    char my_ip[INET_ADDRSTRLEN];
+    inet_ntop( AF_INET, &ipAddr, my_ip, INET_ADDRSTRLEN );
+    stringstream ss;
+    ss << string(my_ip) << ":" << r_port;
+    return ss.str();
 }

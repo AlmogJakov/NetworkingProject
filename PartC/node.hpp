@@ -66,3 +66,4 @@ void send_discover(int dst, int discover_id);
 void send_relay(int destination,int original_id);
 
 void print_ip_info(int r_port);
+string get_ip_port();
