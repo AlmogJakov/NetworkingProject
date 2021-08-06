@@ -236,6 +236,10 @@ int main(int argc, char *argv[]) {
 
 /* ----------------------------- SETID (STDIN) ---------------------------------- */
 void std_setid(stringstream& ss,string splited[]) {
+    if (id!=INT_MIN) { /* ID has already been set */
+        cout << "nack" << endl;
+        return;
+    }
     getline(ss,splited[1],','); /* id */
     id = stoi(splited[1]);
     cout << "ack" << endl;
