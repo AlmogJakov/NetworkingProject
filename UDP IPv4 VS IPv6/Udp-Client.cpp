@@ -20,7 +20,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#define SERVER_IP_ADDRESS "192.168.190.129"
+#define SERVER_IP_ADDRESS "127.0.0.1"
 #define SERVER_PORT 5060
 
 int main() {

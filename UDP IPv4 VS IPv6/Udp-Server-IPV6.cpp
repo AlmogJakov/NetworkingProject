@@ -28,7 +28,7 @@
 #include <unistd.h>
 #endif
 
-#define SERVER_IP_ADDRESS " 192.168.56.1"
+#define SERVER_IP_ADDRESS "127.0.0.1"
 #define SERVER_PORT 5060
 
 int main() {

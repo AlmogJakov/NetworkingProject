@@ -533,10 +533,13 @@ void input_nack(message* msg, int ret) {
 
 /* ------------------------------ CONNECT INPUT --------------------------------- */
 void input_connect(message* msg, int ret){
+    /* if the id is not defined */
     if (id==INT_MIN) {
         send_nack(msg);
         return;
     }
+    /* since assuming that each node has a different id,
+       if msg->src==id then sending the message is from node to itself */
     if (msg->src==id) {
         cout << "nack" << endl;
         return;
