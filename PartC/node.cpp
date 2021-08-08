@@ -537,6 +537,10 @@ void input_connect(message* msg, int ret){
         send_nack(msg);
         return;
     }
+    if (msg->src==id) {
+        cout << "nack" << endl;
+        return;
+    }
     message rply; /* ack */
     rply.id=random();
     rply.src=id;
