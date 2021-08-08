@@ -5,7 +5,7 @@
 	- [ Methods ](#-the-methods-implemented-in-this-class-)
 2. [ UDP IPv4 VS IPv6 (additional) ](#udp-ipv4-vs-ipv6)
 	- [ Netstat & Headers ](#udp-ipv4-vs-ipv6)
-	- [ #Differences Between IPV4 and IPV6 ](#differences-between-ipv4-and-ipv6)
+	- [ Differences Between IPV4 and IPV6 ](#differences-between-ipv4-and-ipv6)
 3. [ UDP Pinger (additional) ](#udp-pinger)
 	- [ Simple UDP Pinger ](#udp-pinger)
 	- [ UDP HeartBeat Pinger ](#udpheartbeat)
