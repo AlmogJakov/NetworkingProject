@@ -5,7 +5,7 @@
 	- [ Methods ](#-the-methods-implemented-in-this-class-)
 2. [ UDP IPv4 VS IPv6 (additional) ](#udp-ipv4-vs-ipv6)
 	- [ Netstat & Headers ](#udp-ipv4-vs-ipv6)
-	- [ #Differences Between IPV4 and IPV6 ](#differences-between-ipv4-and-ipv6)
+	- [ Differences Between IPV4 and IPV6 ](#differences-between-ipv4-and-ipv6)
 3. [ UDP Pinger (additional) ](#udp-pinger)
 	- [ Simple UDP Pinger ](#udp-pinger)
 	- [ UDP HeartBeat Pinger ](#udpheartbeat)
@@ -24,7 +24,7 @@ In this implementation we develop a node in a network where communication betwee
 	
 <h3>The main method ('discover') for locating a node in the network:</h3>
 <tr><td>
-<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartC/images/discover-animation.gif"/></p>
+<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/Routing%20Protocol%20Implementation/images/discover-animation.gif"/></p>
 </td></tr>
 </table>
 
@@ -108,21 +108,21 @@ Diagnosing the difference between the HEADER of IPV4 versus IPV6 under UDP proto
 	
 | Before running the server  | After running the server |
 | ------------- | ------------- |
-| <p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/show-netstat-before.jpg"/></p>  | <p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/show-netstat-after.jpg"/></p>  |
+| <p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/UDP%20IPv4%20VS%20IPv6/images/show-netstat-before.jpg"/></p>  | <p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/UDP%20IPv4%20VS%20IPv6/images/show-netstat-after.jpg"/></p>  |
 	
 Note that the flag '-n' (netstat -a **-n**) shows network addresses as numbers. When this flag is not specified, the netstat command interprets addresses where possible and displays them symbolically. This flag can be used with any of the display formats. (source: https://www.ibm.com/docs/en/power8/8408-44E?topic=commands-netstat-command)
-<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/flag-netstat.jpg"/></p>
+<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/UDP%20IPv4%20VS%20IPv6/images/flag-netstat.jpg"/></p>
 	
 | IPV4 Client Header:  | IPV4 Server Header: |
 | ------------- | ------------- |
-| <p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ipv4-header-client.jpg"/></p>  | <p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ipv4-header-server.jpg"/></p>  |
+| <p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/UDP%20IPv4%20VS%20IPv6/images/ipv4-header-client.jpg"/></p>  | <p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/UDP%20IPv4%20VS%20IPv6/images/ipv4-header-server.jpg"/></p>  |
 	
 | IPV6 Client Header:  | IPV6 Server Header: |
 | ------------- | ------------- |
-| <p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ipv6-header-client.jpg"/></p>  | <p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ipv6-header-server.jpg"/></p>  |
+| <p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/UDP%20IPv4%20VS%20IPv6/images/ipv6-header-client.jpg"/></p>  | <p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/UDP%20IPv4%20VS%20IPv6/images/ipv6-header-server.jpg"/></p>  |
 	
 <h3>Ping execution:</h3>
-<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ping.jpg" width="60%"/></p>
+<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/UDP%20IPv4%20VS%20IPv6/images/ping.jpg" width="60%"/></p>
 	
 <h3>Differences between IPV4 and IPV6:</h3>    
 	
@@ -131,7 +131,7 @@ Note that the flag '-n' (netstat -a **-n**) shows network addresses as numbers. 
 - The options field does not exist but may have a pointer in the Next Header field.  
 - In IPV6 the addresses are 128 bits long as opposed to IPV4 where the addresses are 32 bits long.  
 	
-<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ipv4VSipv6.jpg"/></p>
+<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/UDP%20IPv4%20VS%20IPv6/images/ipv4VSipv6.jpg"/></p>
 (source: https://www.juniper.net/us/en/research-topics/what-is-ipv4-vs-ipv6.html)
 
 -----
@@ -140,7 +140,7 @@ Note that the flag '-n' (netstat -a **-n**) shows network addresses as numbers. 
 Implementation of sending ping under UDP protocol while losing packets (randomly).
 The program prints the values: Average RTT, Maximum RTT, Minimum RTT, Packet Loss.
 	
-<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartA/images/udp-pinger.jpg"/></p>
+<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/UDP%20Pinger/images/udp-pinger.jpg"/></p>
 
 -----
 
@@ -161,7 +161,7 @@ Another implementation is UDPHeartBeat, this implementation is the same as the i
 - print the input from the server.  
 - print the RTT value.  
 	
-<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartA/images/udp-pinger-heartBeat.jpg"/></p>
+<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/UDP%20Pinger/images/udp-pinger-heartBeat.jpg"/></p>
 
 -----
 Almog Jakov: https://github.com/AlmogJakov  
