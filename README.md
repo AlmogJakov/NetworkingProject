@@ -1,7 +1,14 @@
 
 1. [ Routing Protocol Implementation ](#routing-protocol-implementation)
-2. [ UDP IPv4 VS IPv6 ](#udp-ipv4-vs-ipv6)
-3. [ UDP Pinger ](#udp-pinger)
+	- [ Performable Actions ](#-the-following-actions-can-be-performed-)
+	- [ Data structures ](#-the-data-structures-at-each-node-)
+	- [ Methods ](#-the-methods-implemented-in-this-class-)
+2. [ UDP IPv4 VS IPv6 (additional) ](#udp-ipv4-vs-ipv6)
+	- [ Netstat & Headers ](#udp-ipv4-vs-ipv6)
+	- [ #Differences Between IPV4 and IPV6 ](#differences-between-ipv4-and-ipv6)
+3. [ UDP Pinger (additional) ](#udp-pinger)
+	- [ Simple UDP Pinger ](#udp-pinger)
+	- [ UDP HeartBeat Pinger ](#udpheartbeat)
 
 -----
 
@@ -38,7 +45,9 @@ In this implementation we develop a node in a network where communication betwee
 <h2> 'Node' (Represents a vertex): </h2>
 
 Represents a network computer.
-Contains a number of data structures in order to perform mutual communication operations between computers:
+Contains a number of data structures in order to perform mutual communication operations between computers.
+
+<h3> The data structures at each node: </h3>    
 
 - **int id** - a unique id that represents the computer on the network.  
 - **unordered_map <int, unsigned int> sockets** - map of the connected nodes (key - socket id. value - socket fd).  
@@ -97,26 +106,20 @@ The following actions can be performed:
 # UDP IPv4 VS IPv6
 Diagnosing the difference between the HEADER of IPV4 versus IPV6 under UDP protocol.
 	
-<h3>Before running the server:</h3>
-<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/show-netstat-before.jpg" width="60%"/></p>
-	
-<h3>After running the server:</h3>
-<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/show-netstat-after.jpg" width="60%"/></p>
+| Before running the server  | After running the server |
+| ------------- | ------------- |
+| <p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/show-netstat-before.jpg"/></p>  | <p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/show-netstat-after.jpg"/></p>  |
 	
 Note that the flag '-n' (netstat -a **-n**) shows network addresses as numbers. When this flag is not specified, the netstat command interprets addresses where possible and displays them symbolically. This flag can be used with any of the display formats. (source: https://www.ibm.com/docs/en/power8/8408-44E?topic=commands-netstat-command)
 <p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/flag-netstat.jpg"/></p>
 	
-<h3>IPV4 Client Header:</h3>
-<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ipv4-header-client.jpg" width="60%"/></p>
+| IPV4 Client Header:  | IPV4 Server Header: |
+| ------------- | ------------- |
+| <p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ipv4-header-client.jpg"/></p>  | <p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ipv4-header-server.jpg"/></p>  |
 	
-<h3>IPV4 Server Header:</h3>
-<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ipv4-header-server.jpg" width="60%"/></p>
-	
-<h3>IPV6 Client Header:</h3>
-<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ipv6-header-client.jpg" width="60%"/></p>
-	
-<h3>IPV6 Server Header:</h3>
-<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ipv6-header-server.jpg" width="60%"/></p>
+| IPV6 Client Header:  | IPV6 Server Header: |
+| ------------- | ------------- |
+| <p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ipv6-header-client.jpg"/></p>  | <p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ipv6-header-server.jpg"/></p>  |
 	
 <h3>Ping execution:</h3>
 <p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/PartB/images/ping.jpg" width="60%"/></p>
