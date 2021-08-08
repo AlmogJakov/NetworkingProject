@@ -176,7 +176,7 @@ int main(int argc, char *argv[]) {
             if (splited[0].compare("setid")!=0 && id == INT_MIN) {
                 cout << "nack" << endl;
                 continue;
-            }else if (splited[0].compare("setid")==0) {std_setid(ss,splited);}
+            } else if (splited[0].compare("setid")==0) {std_setid(ss,splited);}
             else if (splited[0].compare("connect")==0) {std_connect(ss,splited);}
             else if (splited[0].compare("send")==0) {std_send(ss,splited);}
             else if (splited[0].compare("route")==0) {std_route(ss,splited);}
@@ -291,10 +291,21 @@ void std_connect(stringstream& ss,string splited[]) {
 void std_send(stringstream& ss,string splited[]) {
     getline(ss,splited[1],','); /* destination */
     getline(ss,splited[2],','); /* message length */
+    /* if id not defined */
+    if (id==INT_MIN) {
+        cout << "nack" << endl;
+        return;
+    }
     if (splited[2].at(splited[2].size()-1)=='\n') {splited[2].pop_back();}
     //getline(ss,splited[3],','); /* message itself */
     splited[3].resize(stoi(splited[2]));
     getline(ss, splited[3]); /* message itself */
+    /* send from node to itself */
+    if (stoi(splited[1])==id) {
+        cout << splited[3] << endl;
+        cout << "ack" << endl;
+        return;
+    }
     if (sockets.size()==0) { /* No neighbors at all!. TODO: send to myself */
         cout << "NACK" << endl;
         return;
