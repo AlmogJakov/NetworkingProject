@@ -131,7 +131,7 @@ Note that the flag '-n' (netstat -a **-n**) shows network addresses as numbers. 
 - The options field does not exist but may have a pointer in the Next Header field.  
 - In IPV6 the addresses are 128 bits long as opposed to IPV4 where the addresses are 32 bits long.  
 	
-<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/UDP%20IPv4%20VS%20IPv6/images/ipv4VSipv6.jpg"/></p>
+<p align="center"><img src="https://github.com/AlmogJakov/NetworkingProject/blob/main/UDP%20IPv4%20VS%20IPv6/images/ipv4vsipv6.jpg"/></p>
 (source: https://www.juniper.net/us/en/research-topics/what-is-ipv4-vs-ipv6.html)
 
 -----
